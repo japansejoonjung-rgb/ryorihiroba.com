@@ -3,15 +3,26 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-// Firebase 설정 정보
-// Firebase Console에서 프로젝트를 만들고 웹 앱을 등록한 후 아래에 붙여넣으세요
+const firebaseFallbackConfig = {
+  apiKey: 'AIzaSyAz-DK9xjSLYPjwL-sKHaE14OWs3kWphwc',
+  authDomain: 'ryori-hiroba.firebaseapp.com',
+  projectId: 'ryori-hiroba',
+  storageBucket: 'ryori-hiroba.firebasestorage.app',
+  messagingSenderId: '159550416341',
+  appId: '1:159550416341:web:215b127fcf4223b8e7495c',
+};
+
+// Firebase 웹 설정값은 클라이언트에서 공개되는 값이라 배포 환경에서 기본값으로도 사용합니다.
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || firebaseFallbackConfig.apiKey,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || firebaseFallbackConfig.authDomain,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || firebaseFallbackConfig.projectId,
+  storageBucket:
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || firebaseFallbackConfig.storageBucket,
+  messagingSenderId:
+    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ||
+    firebaseFallbackConfig.messagingSenderId,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || firebaseFallbackConfig.appId,
 };
 
 const requiredFirebaseKeys = [
