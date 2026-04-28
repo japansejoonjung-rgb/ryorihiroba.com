@@ -109,13 +109,17 @@ export const addRecipe = async (
     updatedAt: now,
   });
 
-  await awardPointsOnce({
-    userId,
-    amount: 20,
-    type: 'recipe_post',
-    sourceId: docRef.id,
-    description: '레시피投稿 포인트',
-  });
+  try {
+    await awardPointsOnce({
+      userId,
+      amount: 20,
+      type: 'recipe_post',
+      sourceId: docRef.id,
+      description: '레시피投稿 포인트',
+    });
+  } catch {
+    // The recipe should still be posted even if point rules are not ready yet.
+  }
 
   return docRef.id;
 };
@@ -207,13 +211,17 @@ export const toggleRecipeLike = async (
 
   const authorId = await getRecipeAuthorId(recipeId);
   if (authorId && authorId !== userId) {
-    await awardPointsOnce({
-      userId: authorId,
-      amount: 5,
-      type: 'like_received',
-      sourceId: `${recipeId}_${userId}`,
-      description: '추천을 받은 레시피 포인트',
-    });
+    try {
+      await awardPointsOnce({
+        userId: authorId,
+        amount: 5,
+        type: 'like_received',
+        sourceId: `${recipeId}_${userId}`,
+        description: '추천을 받은 레시피 포인트',
+      });
+    } catch {
+      // Likes still count even if point rules are not ready yet.
+    }
   }
 
   return true;

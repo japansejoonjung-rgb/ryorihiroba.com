@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { AlertCircle, ImagePlus, Loader2, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { categories } from "@/data/recipes";
 import { addRecipe, getRecipeById, updateRecipe } from "@/lib/firestoreService";
-import { uploadRecipeImage } from "@/lib/storageService";
 import { Difficulty, Recipe } from "@/types/recipe";
 
 const fallbackImage =
@@ -21,7 +20,6 @@ export default function RecipeForm() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
   const [time, setTime] = useState("20");
   const [servings, setServings] = useState("2");
@@ -99,20 +97,6 @@ export default function RecipeForm() {
     setSteps(next);
   };
 
-  const handleImageFile = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      setError("画像ファイルを選択してください。");
-      return;
-    }
-
-    setError("");
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
-  };
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
@@ -135,8 +119,6 @@ export default function RecipeForm() {
     const displayName = user.displayName || user.email?.split("@")[0] || "料理好きユーザー";
     const authorAvatar =
       user.photoURL || `https://i.pravatar.cc/100?u=${encodeURIComponent(user.uid)}`;
-
-    const imageKey = editId || crypto.randomUUID();
 
     const recipeData: Omit<Recipe, "id"> = {
       title: title.trim(),
@@ -167,9 +149,7 @@ export default function RecipeForm() {
 
     setSubmitting(true);
     try {
-      const imageUrl = imageFile
-        ? await uploadRecipeImage(user.uid, imageKey, imageFile)
-        : image.trim() || imagePreview || fallbackImage;
+      const imageUrl = image.trim() || imagePreview || fallbackImage;
 
       if (editId) {
         const { likes, views, saves, createdAt: _createdAt, ...editableData } = recipeData;
@@ -236,11 +216,8 @@ export default function RecipeForm() {
                 )}
               </div>
               <div className="grid gap-3">
-                <label className="flex cursor-pointer items-center justify-center rounded-2xl border-2 border-dashed border-orange-200 bg-orange-50 px-4 py-5 text-sm font-bold text-orange-500 hover:bg-orange-100">
-                  写真をアップロード
-                  <input type="file" accept="image/*" onChange={handleImageFile} className="hidden" />
-                </label>
-                <input value={image} onChange={(e) => { setImage(e.target.value); setImagePreview(e.target.value); }} type="url" placeholder="または画像URLを入力" className="rounded-2xl border border-orange-100 px-4 py-3 outline-none focus:border-orange-300" />
+                <input value={image} onChange={(e) => { setImage(e.target.value); setImagePreview(e.target.value); }} type="url" placeholder="画像URLを入力" className="rounded-2xl border border-orange-100 px-4 py-3 outline-none focus:border-orange-300" />
+                <p className="rounded-2xl bg-amber-50 px-4 py-3 text-xs font-semibold leading-5 text-amber-700">写真ファイルの直接アップロードはFirebase Storage有料設定後に使えます。今は画像URLで登録してください。</p>
               </div>
             </div>
           </label>

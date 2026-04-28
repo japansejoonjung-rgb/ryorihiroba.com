@@ -144,13 +144,17 @@ export const createUserProfile = async ({
     updatedAt: now,
   });
 
-  await awardPointsOnce({
-    userId: uid,
-    amount: 10,
-    type: 'signup',
-    sourceId: uid,
-    description: '회원가입 보너스',
-  });
+  try {
+    await awardPointsOnce({
+      userId: uid,
+      amount: 10,
+      type: 'signup',
+      sourceId: uid,
+      description: '회원가입 보너스',
+    });
+  } catch {
+    // Account creation should not fail while point rules are being configured.
+  }
 };
 
 export const ensureUserProfile = async ({
