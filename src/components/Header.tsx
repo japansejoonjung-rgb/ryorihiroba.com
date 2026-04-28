@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
-import { CircleUserRound, Coins, Globe2, LogOut, Search, Menu, X } from "lucide-react";
+import { CircleUserRound, Coins, Globe2, Home, ListPlus, LogOut, Search, Menu, Trophy, Utensils, X } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Language, useLanguage } from "@/context/LanguageContext";
@@ -11,6 +12,7 @@ import { logoutUser } from "@/lib/authService";
 
 export default function Header() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading } = useAuth();
   const { profile } = useUserProfile(user?.uid);
   const { language, setLanguage, t } = useLanguage();
@@ -51,10 +53,19 @@ export default function Header() {
     { label: "English", value: "en" },
   ];
 
+  const mobileTabs = [
+    { label: t.recommended, href: "/", icon: Home },
+    { label: t.categories, href: "/categories", icon: Utensils },
+    { label: t.ranking, href: "/ranking", icon: Trophy },
+    { label: t.post, href: "/post", icon: ListPlus },
+    { label: t.mypage, href: user ? "/mypage" : "/login", icon: CircleUserRound },
+  ];
+
   return (
-    <header className="sticky top-0 z-50 border-b border-orange-100 bg-white/90 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
-        <Link href="/" className="text-2xl font-black tracking-tight text-orange-500">{t.brand}</Link>
+    <>
+    <header className="sticky top-0 z-50 border-b border-orange-100 bg-white/95 backdrop-blur">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
+        <Link href="/" className="max-w-[52vw] truncate text-xl font-black tracking-tight text-orange-500 sm:text-2xl">{t.brand}</Link>
         <form onSubmit={handleSearch} className="hidden flex-1 items-center rounded-full border border-orange-100 bg-orange-50 px-4 py-2 md:flex">
           <Search size={18} className="text-orange-400" />
           <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder={t.searchPlaceholder} className="ml-2 w-full bg-transparent text-sm outline-none placeholder:text-stone-400" />
@@ -63,7 +74,7 @@ export default function Header() {
           {navItems.map((item) => <Link key={item.label} href={item.href} className="hover:text-orange-500">{item.label}</Link>)}
         </nav>
         <div className="relative hidden md:block">
-          <button type="button" onClick={() => setLanguageOpen((value) => !value)} className="rounded-full border border-orange-100 p-2 text-stone-600 hover:bg-orange-50" aria-label="language">
+          <button type="button" onClick={() => setLanguageOpen((value) => !value)} className="tap-target rounded-full border border-orange-100 p-2 text-stone-600 hover:bg-orange-50" aria-label="language">
             <Globe2 size={20} />
           </button>
           {languageOpen && (
@@ -106,12 +117,12 @@ export default function Header() {
             )}
           </div>
         )}
-        <button onClick={() => setOpen((prev) => !prev)} className="rounded-full border border-orange-100 p-2 md:hidden" aria-label="menu">
+        <button onClick={() => setOpen((prev) => !prev)} className="tap-target rounded-full border border-orange-100 p-2 md:hidden" aria-label="menu">
           {open ? <X size={22} /> : <Menu size={22} />}
         </button>
       </div>
       {open && (
-        <div className="border-t border-orange-100 bg-white px-4 py-4 md:hidden">
+        <div className="border-t border-orange-100 bg-white px-4 py-4 shadow-lg md:hidden">
           <form onSubmit={handleSearch} className="mb-4 flex items-center rounded-full border border-orange-100 bg-orange-50 px-4 py-2">
             <Search size={18} className="text-orange-400" />
             <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder={t.searchPlaceholder} className="ml-2 w-full bg-transparent text-sm outline-none" />
@@ -159,5 +170,20 @@ export default function Header() {
         </div>
       )}
     </header>
+    <nav className="safe-bottom fixed inset-x-0 bottom-0 z-50 border-t border-orange-100 bg-white/95 shadow-[0_-8px_20px_rgba(120,80,40,0.08)] backdrop-blur md:hidden">
+      <div className="grid grid-cols-5 px-1 pt-1">
+        {mobileTabs.map((item) => {
+          const Icon = item.icon;
+          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          return (
+            <Link key={item.href} href={item.href} className={`flex min-h-[62px] flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[11px] font-bold ${active ? "text-orange-500" : "text-stone-500"}`}>
+              <Icon size={21} strokeWidth={active ? 2.6 : 2} />
+              <span className="max-w-full truncate">{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+    </>
   );
 }

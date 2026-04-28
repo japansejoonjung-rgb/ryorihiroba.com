@@ -186,28 +186,28 @@ export default function RecipeDetail({ recipe, relatedRecipes }: Props) {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
+    <div className="mx-auto max-w-7xl px-4 py-5 sm:py-8">
       <section className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="overflow-hidden rounded-3xl bg-white shadow-sm">
-          <img src={recipe.image} alt={recipe.title} className="h-[280px] w-full object-cover md:h-[460px]" />
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm sm:rounded-3xl">
+          <img src={recipe.image} alt={recipe.title} className="h-[240px] w-full object-cover sm:h-[320px] md:h-[460px]" />
         </div>
-        <div className="rounded-3xl border border-orange-100 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm sm:rounded-3xl sm:p-6">
           <div className="mb-3 inline-flex rounded-full bg-orange-50 px-4 py-2 text-sm font-bold text-orange-500">{recipe.category}</div>
-          <h1 className="text-3xl font-black leading-tight text-stone-900 md:text-4xl">{recipe.title}</h1>
+          <h1 className="text-2xl font-black leading-tight text-stone-900 md:text-4xl">{recipe.title}</h1>
           <p className="mt-4 leading-7 text-stone-600">{recipe.description}</p>
           <div className="mt-6 flex items-center gap-3">
             <img src={recipe.author.avatar} alt={recipe.author.name} className="h-12 w-12 rounded-full" />
             <div><p className="font-bold">{recipe.author.name}</p><p className="text-sm text-stone-500">{recipe.author.bio}</p></div>
           </div>
-          <div className="mt-6 grid grid-cols-3 gap-3">
-            <div className="rounded-2xl bg-orange-50 p-4 text-center"><Clock className="mx-auto text-orange-500" size={22} /><p className="mt-2 text-sm font-bold">{recipe.time}分</p></div>
-            <div className="rounded-2xl bg-orange-50 p-4 text-center"><Users className="mx-auto text-orange-500" size={22} /><p className="mt-2 text-sm font-bold">{recipe.servings}人分</p></div>
-            <div className="rounded-2xl bg-orange-50 p-4 text-center"><span className="text-xl">👁</span><p className="mt-2 text-sm font-bold">{viewCount.toLocaleString()} views</p></div>
+          <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
+            <div className="rounded-2xl bg-orange-50 p-3 text-center sm:p-4"><Clock className="mx-auto text-orange-500" size={22} /><p className="mt-2 text-xs font-bold sm:text-sm">{recipe.time}分</p></div>
+            <div className="rounded-2xl bg-orange-50 p-3 text-center sm:p-4"><Users className="mx-auto text-orange-500" size={22} /><p className="mt-2 text-xs font-bold sm:text-sm">{recipe.servings}人分</p></div>
+            <div className="rounded-2xl bg-orange-50 p-3 text-center sm:p-4"><span className="text-xl">👁</span><p className="mt-2 text-xs font-bold sm:text-sm">{viewCount.toLocaleString()}</p></div>
           </div>
           <div className="mt-6 flex flex-wrap gap-3">
-            <button onClick={handleLike} className={`rounded-full px-5 py-3 text-sm font-bold ${liked ? "bg-rose-500 text-white" : "bg-rose-50 text-rose-500 hover:bg-rose-100"}`}><span className="inline-flex items-center gap-2"><Heart size={18} fill={liked ? "currentColor" : "none"} />いいね {likeCount}</span></button>
-            <button onClick={handleSave} className={`rounded-full px-5 py-3 text-sm font-bold ${saved ? "bg-orange-500 text-white" : "bg-orange-50 text-orange-500 hover:bg-orange-100"}`}><span className="inline-flex items-center gap-2"><Bookmark size={18} fill={saved ? "currentColor" : "none"} />保存</span></button>
-            <button onClick={handleShare} className="rounded-full bg-stone-100 px-5 py-3 text-sm font-bold text-stone-600 hover:bg-stone-200"><span className="inline-flex items-center gap-2"><Share2 size={18} />共有</span></button>
+            <button onClick={handleLike} className={`tap-target rounded-full px-5 py-3 text-sm font-bold ${liked ? "bg-rose-500 text-white" : "bg-rose-50 text-rose-500 hover:bg-rose-100"}`}><span className="inline-flex items-center gap-2"><Heart size={18} fill={liked ? "currentColor" : "none"} />いいね {likeCount}</span></button>
+            <button onClick={handleSave} className={`tap-target rounded-full px-5 py-3 text-sm font-bold ${saved ? "bg-orange-500 text-white" : "bg-orange-50 text-orange-500 hover:bg-orange-100"}`}><span className="inline-flex items-center gap-2"><Bookmark size={18} fill={saved ? "currentColor" : "none"} />保存</span></button>
+            <button onClick={handleShare} className="tap-target rounded-full bg-stone-100 px-5 py-3 text-sm font-bold text-stone-600 hover:bg-stone-200"><span className="inline-flex items-center gap-2"><Share2 size={18} />共有</span></button>
           </div>
           {canManageRecipe && (
             <div className="mt-4 flex flex-wrap gap-3 border-t border-orange-50 pt-4">

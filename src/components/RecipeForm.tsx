@@ -195,13 +195,13 @@ export default function RecipeForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-8">
-      <section className="rounded-3xl border border-orange-100 bg-white p-6 shadow-sm">
+    <form onSubmit={handleSubmit} className="grid gap-5 sm:gap-8">
+      <section className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm sm:rounded-3xl sm:p-6">
         <h2 className="text-xl font-black">{editId ? "レシピ編集" : "基本情報"}</h2>
         <div className="mt-5 grid gap-5">
           <label className="grid gap-2">
             <span className="text-sm font-bold">タイトル</span>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="例：ふわとろ親子丼" className="rounded-2xl border border-orange-100 px-4 py-3 outline-none focus:border-orange-300" />
+            <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="例：ふわとろ親子丼" className="tap-target rounded-2xl border border-orange-100 px-4 py-3 outline-none focus:border-orange-300" />
           </label>
           <label className="grid gap-2">
             <span className="text-sm font-bold">代表画像</span>
@@ -216,7 +216,7 @@ export default function RecipeForm() {
                 )}
               </div>
               <div className="grid gap-3">
-                <input value={image} onChange={(e) => { setImage(e.target.value); setImagePreview(e.target.value); }} type="url" placeholder="画像URLを入力" className="rounded-2xl border border-orange-100 px-4 py-3 outline-none focus:border-orange-300" />
+                <input value={image} onChange={(e) => { setImage(e.target.value); setImagePreview(e.target.value); }} type="url" placeholder="画像URLを入力" className="tap-target rounded-2xl border border-orange-100 px-4 py-3 outline-none focus:border-orange-300" />
                 <p className="rounded-2xl bg-amber-50 px-4 py-3 text-xs font-semibold leading-5 text-amber-700">写真ファイルの直接アップロードはFirebase Storage有料設定後に使えます。今は画像URLで登録してください。</p>
               </div>
             </div>
@@ -252,17 +252,17 @@ export default function RecipeForm() {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-orange-100 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm sm:rounded-3xl sm:p-6">
         <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-black">材料</h2><button type="button" onClick={addIngredient} className="rounded-full bg-orange-50 px-4 py-2 text-sm font-bold text-orange-500 hover:bg-orange-100"><span className="inline-flex items-center gap-1"><Plus size={16} />材料追加</span></button></div>
         <div className="mt-5 grid gap-3">{ingredients.map((ingredient, index) => <div key={index} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]"><input value={ingredient.name} onChange={(e) => updateIngredient(index, "name", e.target.value)} placeholder="材料名" className="rounded-2xl border border-orange-100 px-4 py-3 outline-none focus:border-orange-300" /><input value={ingredient.amount} onChange={(e) => updateIngredient(index, "amount", e.target.value)} placeholder="分量" className="rounded-2xl border border-orange-100 px-4 py-3 outline-none focus:border-orange-300" /><button type="button" onClick={() => removeIngredient(index)} className="rounded-2xl bg-stone-100 px-4 py-3 text-stone-500 hover:bg-rose-50 hover:text-rose-500"><Trash2 size={18} /></button></div>)}</div>
       </section>
 
-      <section className="rounded-3xl border border-orange-100 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm sm:rounded-3xl sm:p-6">
         <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-black">作り方</h2><button type="button" onClick={addStep} className="rounded-full bg-orange-50 px-4 py-2 text-sm font-bold text-orange-500 hover:bg-orange-100"><span className="inline-flex items-center gap-1"><Plus size={16} />手順追加</span></button></div>
         <div className="mt-5 grid gap-4">{steps.map((step, index) => <div key={index} className="flex gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-500 font-black text-white">{index + 1}</div><textarea value={step} onChange={(e) => updateStep(index, e.target.value)} placeholder="調理手順を入力" className="min-h-24 flex-1 rounded-2xl border border-orange-100 px-4 py-3 outline-none focus:border-orange-300" /><button type="button" onClick={() => removeStep(index)} className="h-12 rounded-2xl bg-stone-100 px-4 text-stone-500 hover:bg-rose-50 hover:text-rose-500"><Trash2 size={18} /></button></div>)}</div>
       </section>
 
-      <section className="rounded-3xl border border-orange-100 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm sm:rounded-3xl sm:p-6">
         <h2 className="text-xl font-black">タグ・補足</h2>
         <div className="mt-5 grid gap-5">
           <label className="grid gap-2">
