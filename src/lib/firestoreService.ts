@@ -12,6 +12,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { getFirebaseDb } from './firebase';
+import { awardPointsOnce } from './userService';
 import { Recipe } from '@/types/recipe';
 
 export type RecipeComment = {
@@ -87,6 +88,13 @@ const safeUpdateRecipeMetric = async (
   }
 };
 
+const getRecipeAuthorId = async (recipeId: string) => {
+  const db = getFirebaseDb();
+  const recipeSnap = await getDoc(doc(db, 'recipes', recipeId));
+  const authorId = recipeSnap.exists() ? recipeSnap.data().authorId : undefined;
+  return typeof authorId === 'string' ? authorId : undefined;
+};
+
 // 레시피 추가
 export const addRecipe = async (
   userId: string,
@@ -99,6 +107,14 @@ export const addRecipe = async (
     authorId: userId,
     createdAt: recipeData.createdAt || now,
     updatedAt: now,
+  });
+
+  await awardPointsOnce({
+    userId,
+    amount: 20,
+    type: 'recipe_post',
+    sourceId: docRef.id,
+    description: '레시피投稿 포인트',
   });
 
   return docRef.id;
@@ -188,6 +204,18 @@ export const toggleRecipeLike = async (
     createdAt: new Date().toISOString(),
   });
   await safeUpdateRecipeMetric(recipeId, 'likes', 1);
+
+  const authorId = await getRecipeAuthorId(recipeId);
+  if (authorId && authorId !== userId) {
+    await awardPointsOnce({
+      userId: authorId,
+      amount: 5,
+      type: 'like_received',
+      sourceId: `${recipeId}_${userId}`,
+      description: '추천을 받은 레시피 포인트',
+    });
+  }
+
   return true;
 };
 

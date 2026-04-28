@@ -6,14 +6,17 @@ import { Bookmark, Clock, Heart, Loader2, Share2, Users } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import {
   addRecipeComment,
+  deleteRecipe,
   getRecipeActivityStatus,
   getRecipeComments,
   RecipeComment,
   toggleRecipeLike,
   toggleRecipeSave,
 } from "@/lib/firestoreService";
+import { banUser } from "@/lib/userService";
 
 type Props = {
   recipe: Recipe;
@@ -23,6 +26,7 @@ type Props = {
 export default function RecipeDetail({ recipe, relatedRecipes }: Props) {
   const router = useRouter();
   const { user } = useAuth();
+  const { profile } = useUserProfile(user?.uid);
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [likeCount, setLikeCount] = useState(recipe.likes);
@@ -147,6 +151,25 @@ export default function RecipeDetail({ recipe, relatedRecipes }: Props) {
     }
   };
 
+  const canManageRecipe = Boolean(user && (profile?.role === "admin" || recipe.authorId === user.uid));
+
+  const handleDeleteRecipe = async () => {
+    const confirmed = window.confirm("このレシピを削除しますか？");
+    if (!confirmed) return;
+
+    await deleteRecipe(recipe.id);
+    router.push("/recipes");
+  };
+
+  const handleBanAuthor = async () => {
+    if (!recipe.authorId) return;
+    const confirmed = window.confirm("この投稿者の利用を制限しますか？");
+    if (!confirmed) return;
+
+    await banUser(recipe.authorId);
+    alert("投稿者を利用制限にしました。");
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
       <section className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
@@ -171,6 +194,15 @@ export default function RecipeDetail({ recipe, relatedRecipes }: Props) {
             <button onClick={handleSave} className={`rounded-full px-5 py-3 text-sm font-bold ${saved ? "bg-orange-500 text-white" : "bg-orange-50 text-orange-500 hover:bg-orange-100"}`}><span className="inline-flex items-center gap-2"><Bookmark size={18} fill={saved ? "currentColor" : "none"} />保存</span></button>
             <button onClick={handleShare} className="rounded-full bg-stone-100 px-5 py-3 text-sm font-bold text-stone-600 hover:bg-stone-200"><span className="inline-flex items-center gap-2"><Share2 size={18} />共有</span></button>
           </div>
+          {canManageRecipe && (
+            <div className="mt-4 flex flex-wrap gap-3 border-t border-orange-50 pt-4">
+              {recipe.authorId === user?.uid && <button onClick={() => router.push(`/post?edit=${recipe.id}`)} className="rounded-full border border-orange-200 px-5 py-3 text-sm font-bold text-orange-500 hover:bg-orange-50">編集</button>}
+              <button onClick={handleDeleteRecipe} className="rounded-full border border-rose-200 px-5 py-3 text-sm font-bold text-rose-500 hover:bg-rose-50">削除</button>
+              {profile?.role === "admin" && recipe.authorId && recipe.authorId !== user?.uid && (
+                <button onClick={handleBanAuthor} className="rounded-full bg-rose-500 px-5 py-3 text-sm font-bold text-white hover:bg-rose-600">投稿者をBAN</button>
+              )}
+            </div>
+          )}
         </div>
       </section>
       <section className="mt-10 grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">

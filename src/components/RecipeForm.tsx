@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
-import { AlertCircle, Loader2, Plus, Trash2 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { AlertCircle, ImagePlus, Loader2, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { categories } from "@/data/recipes";
-import { addRecipe } from "@/lib/firestoreService";
+import { addRecipe, getRecipeById, updateRecipe } from "@/lib/firestoreService";
+import { uploadRecipeImage } from "@/lib/storageService";
 import { Difficulty, Recipe } from "@/types/recipe";
 
 const fallbackImage =
@@ -14,10 +15,14 @@ const fallbackImage =
 
 export default function RecipeForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading } = useAuth();
+  const editId = searchParams.get("edit");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState("");
   const [time, setTime] = useState("20");
   const [servings, setServings] = useState("2");
   const [difficulty, setDifficulty] = useState<Difficulty>("簡単");
@@ -26,8 +31,52 @@ export default function RecipeForm() {
   const [tips, setTips] = useState("");
   const [ingredients, setIngredients] = useState([{ name: "", amount: "" }]);
   const [steps, setSteps] = useState([""]);
+  const [createdAt, setCreatedAt] = useState("");
+  const [editingLoading, setEditingLoading] = useState(Boolean(editId));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!editId) {
+      setEditingLoading(false);
+      return;
+    }
+
+    let mounted = true;
+    setEditingLoading(true);
+    getRecipeById(editId)
+      .then((recipe) => {
+        if (!mounted) return;
+        if (user && recipe.authorId && recipe.authorId !== user.uid) {
+          setError("自分のレシピだけ編集できます。");
+          return;
+        }
+
+        setTitle(recipe.title);
+        setDescription(recipe.description);
+        setImage(recipe.image);
+        setImagePreview(recipe.image);
+        setTime(String(recipe.time));
+        setServings(String(recipe.servings));
+        setDifficulty(recipe.difficulty);
+        setCategory(recipe.category);
+        setTags(recipe.tags.join(", "));
+        setTips(recipe.tips);
+        setIngredients(recipe.ingredients.length > 0 ? recipe.ingredients : [{ name: "", amount: "" }]);
+        setSteps(recipe.steps.length > 0 ? recipe.steps : [""]);
+        setCreatedAt(recipe.createdAt);
+      })
+      .catch(() => {
+        if (mounted) setError("編集할 레시피를 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (mounted) setEditingLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [editId, user]);
 
   const addIngredient = () => setIngredients([...ingredients, { name: "", amount: "" }]);
   const removeIngredient = (index: number) => {
@@ -48,6 +97,20 @@ export default function RecipeForm() {
     const next = [...steps];
     next[index] = value;
     setSteps(next);
+  };
+
+  const handleImageFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("画像ファイルを選択してください。");
+      return;
+    }
+
+    setError("");
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -73,6 +136,8 @@ export default function RecipeForm() {
     const authorAvatar =
       user.photoURL || `https://i.pravatar.cc/100?u=${encodeURIComponent(user.uid)}`;
 
+    const imageKey = editId || crypto.randomUUID();
+
     const recipeData: Omit<Recipe, "id"> = {
       title: title.trim(),
       description: description.trim(),
@@ -97,13 +162,29 @@ export default function RecipeForm() {
       ingredients: cleanIngredients,
       steps: cleanSteps,
       tips: tips.trim() || "作りやすい分量に調整しながら楽しんでください。",
-      createdAt: new Date().toISOString(),
+      createdAt: createdAt || new Date().toISOString(),
     };
 
     setSubmitting(true);
     try {
-      const recipeId = await addRecipe(user.uid, recipeData);
-      router.push(`/recipes/detail?id=${recipeId}`);
+      const imageUrl = imageFile
+        ? await uploadRecipeImage(user.uid, imageKey, imageFile)
+        : image.trim() || imagePreview || fallbackImage;
+
+      if (editId) {
+        const { likes, views, saves, createdAt: _createdAt, ...editableData } = recipeData;
+        await updateRecipe(editId, {
+          ...editableData,
+          image: imageUrl,
+        });
+        router.push(`/recipes/detail?id=${editId}`);
+      } else {
+        const recipeId = await addRecipe(user.uid, {
+          ...recipeData,
+          image: imageUrl,
+        });
+        router.push(`/recipes/detail?id=${recipeId}`);
+      }
       router.refresh();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "レシピを投稿できませんでした。");
@@ -112,11 +193,11 @@ export default function RecipeForm() {
     }
   };
 
-  if (loading) {
+  if (loading || editingLoading) {
     return (
       <div className="rounded-3xl border border-orange-100 bg-white p-10 text-center shadow-sm">
         <Loader2 className="mx-auto animate-spin text-orange-500" size={28} />
-        <p className="mt-3 font-bold text-stone-600">ログイン状態を確認しています。</p>
+        <p className="mt-3 font-bold text-stone-600">{editingLoading ? "レシピを読み込んでいます。" : "ログイン状態を確認しています。"}</p>
       </div>
     );
   }
@@ -136,15 +217,32 @@ export default function RecipeForm() {
   return (
     <form onSubmit={handleSubmit} className="grid gap-8">
       <section className="rounded-3xl border border-orange-100 bg-white p-6 shadow-sm">
-        <h2 className="text-xl font-black">基本情報</h2>
+        <h2 className="text-xl font-black">{editId ? "レシピ編集" : "基本情報"}</h2>
         <div className="mt-5 grid gap-5">
           <label className="grid gap-2">
             <span className="text-sm font-bold">タイトル</span>
             <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="例：ふわとろ親子丼" className="rounded-2xl border border-orange-100 px-4 py-3 outline-none focus:border-orange-300" />
           </label>
           <label className="grid gap-2">
-            <span className="text-sm font-bold">代表画像URL</span>
-            <input value={image} onChange={(e) => setImage(e.target.value)} type="url" placeholder="https://..." className="rounded-2xl border border-orange-100 px-4 py-3 outline-none focus:border-orange-300" />
+            <span className="text-sm font-bold">代表画像</span>
+            <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+              <div className="overflow-hidden rounded-3xl border border-orange-100 bg-orange-50">
+                {imagePreview || image ? (
+                  <img src={imagePreview || image} alt="preview" className="h-40 w-full object-cover" />
+                ) : (
+                  <div className="flex h-40 items-center justify-center text-orange-400">
+                    <ImagePlus size={36} />
+                  </div>
+                )}
+              </div>
+              <div className="grid gap-3">
+                <label className="flex cursor-pointer items-center justify-center rounded-2xl border-2 border-dashed border-orange-200 bg-orange-50 px-4 py-5 text-sm font-bold text-orange-500 hover:bg-orange-100">
+                  写真をアップロード
+                  <input type="file" accept="image/*" onChange={handleImageFile} className="hidden" />
+                </label>
+                <input value={image} onChange={(e) => { setImage(e.target.value); setImagePreview(e.target.value); }} type="url" placeholder="または画像URLを入力" className="rounded-2xl border border-orange-100 px-4 py-3 outline-none focus:border-orange-300" />
+              </div>
+            </div>
           </label>
           <label className="grid gap-2">
             <span className="text-sm font-bold">説明</span>
@@ -206,7 +304,7 @@ export default function RecipeForm() {
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
         <button type="submit" disabled={submitting} className="inline-flex items-center justify-center gap-2 rounded-full bg-orange-500 px-8 py-3 font-bold text-white shadow-sm hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-stone-300">
           {submitting && <Loader2 size={18} className="animate-spin" />}
-          登録する
+          {editId ? "更新する" : "登録する"}
         </button>
       </div>
     </form>

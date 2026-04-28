@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CircleUserRound, LogOut, Search, Menu, X } from "lucide-react";
+import { CircleUserRound, Coins, LogOut, Search, Menu, X } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { logoutUser } from "@/lib/authService";
 
 export default function Header() {
   const router = useRouter();
   const { user, loading } = useAuth();
+  const { profile } = useUserProfile(user?.uid);
   const [keyword, setKeyword] = useState("");
   const [open, setOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -37,6 +39,7 @@ export default function Header() {
     { label: "ランキング", href: "/ranking" },
     { label: "コラム", href: "/" },
     { label: "レシピ投稿", href: "/post" },
+    { label: "マイページ", href: "/mypage" },
   ];
 
   return (
@@ -54,10 +57,14 @@ export default function Header() {
           <div className="hidden items-center gap-2 md:flex">
             {user ? (
               <>
-                <span className="inline-flex max-w-44 items-center gap-2 truncate rounded-full bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-600">
+                <Link href="/mypage" className="inline-flex max-w-44 items-center gap-2 truncate rounded-full bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-600">
                   <CircleUserRound size={18} className="shrink-0" />
                   <span className="truncate">{user.displayName || user.email}</span>
-                </span>
+                </Link>
+                <Link href="/mypage" className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-2 text-sm font-bold text-amber-700">
+                  <Coins size={16} />
+                  {profile?.points ?? 0}P
+                </Link>
                 <button
                   type="button"
                   onClick={handleLogout}
@@ -97,6 +104,10 @@ export default function Header() {
                     <CircleUserRound size={18} />
                     <span className="truncate">{user.displayName || user.email}</span>
                   </div>
+                  <Link href="/mypage" onClick={() => setOpen(false)} className="flex items-center justify-center gap-2 rounded-full bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700">
+                    <Coins size={16} />
+                    {profile?.points ?? 0}P
+                  </Link>
                   <button
                     type="button"
                     onClick={handleLogout}

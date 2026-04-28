@@ -2,6 +2,7 @@ import { FirebaseError } from 'firebase/app';
 import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
@@ -9,12 +10,15 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import { getFirebaseAuth } from './firebase';
+import { createUserProfile, ensureUserProfile } from './userService';
 
 // 회원가입
 export const registerUser = async (
   email: string,
   password: string,
-  displayName: string
+  displayName: string,
+  recoveryQuestion: string,
+  recoveryAnswer: string
 ) => {
   try {
     const auth = getFirebaseAuth();
@@ -26,6 +30,14 @@ export const registerUser = async (
     
     // 프로필 이름 설정
     await updateProfile(userCredential.user, { displayName });
+    await createUserProfile({
+      uid: userCredential.user.uid,
+      email,
+      displayName,
+      photoURL: userCredential.user.photoURL,
+      recoveryQuestion,
+      recoveryAnswer,
+    });
     
     return userCredential.user;
   } catch (error) {
@@ -42,6 +54,18 @@ export const loginUser = async (email: string, password: string) => {
       email,
       password
     );
+    const profile = await ensureUserProfile({
+      uid: userCredential.user.uid,
+      email: userCredential.user.email ?? email,
+      displayName: userCredential.user.displayName ?? userCredential.user.email?.split('@')[0] ?? '料理好きユーザー',
+      photoURL: userCredential.user.photoURL,
+    });
+
+    if (profile?.status === 'banned') {
+      await signOut(auth);
+      throw new Error('이 계정은 이용이 제한되었습니다. 운영자에게 문의해주세요.');
+    }
+
     return userCredential.user;
   } catch (error) {
     throw error;
@@ -53,10 +77,26 @@ export const loginWithGoogle = async () => {
   try {
     const provider = new GoogleAuthProvider();
     const userCredential = await signInWithPopup(getFirebaseAuth(), provider);
+    const profile = await ensureUserProfile({
+      uid: userCredential.user.uid,
+      email: userCredential.user.email ?? '',
+      displayName: userCredential.user.displayName ?? '料理好きユーザー',
+      photoURL: userCredential.user.photoURL,
+    });
+
+    if (profile?.status === 'banned') {
+      await signOut(getFirebaseAuth());
+      throw new Error('이 계정은 이용이 제한되었습니다. 운영자에게 문의해주세요.');
+    }
+
     return userCredential.user;
   } catch (error) {
     throw error;
   }
+};
+
+export const sendResetPasswordEmail = async (email: string) => {
+  await sendPasswordResetEmail(getFirebaseAuth(), email);
 };
 
 // 로그아웃
@@ -82,6 +122,10 @@ export const getAuthErrorMessage = (error: unknown) => {
     return error.message;
   }
 
+  if (error instanceof Error && error.message.includes('이 계정은 이용이 제한')) {
+    return error.message;
+  }
+
   if (error instanceof FirebaseError) {
     switch (error.code) {
       case 'auth/email-already-in-use':
@@ -98,6 +142,8 @@ export const getAuthErrorMessage = (error: unknown) => {
         return 'Google 로그인 창이 닫혔습니다.';
       case 'auth/unauthorized-domain':
         return 'Firebase Authentication의 승인된 도메인에 현재 도메인을 추가해주세요.';
+      case 'auth/missing-email':
+        return '비밀번호 재설정 이메일을 입력해주세요.';
       default:
         return `로그인 처리 중 오류가 발생했습니다. (${error.code})`;
     }
