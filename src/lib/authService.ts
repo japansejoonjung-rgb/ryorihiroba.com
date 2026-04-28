@@ -117,37 +117,77 @@ export const getCurrentUser = (): User | null => {
   }
 };
 
-export const getAuthErrorMessage = (error: unknown) => {
+const authMessages = {
+  ja: {
+    restricted: 'このアカウントは利用が制限されています。運営者にお問い合わせください。',
+    emailInUse: 'すでに登録されているメールアドレスです。',
+    invalidEmail: 'メールアドレスの形式が正しくありません。',
+    invalidCredential: 'メールアドレスまたはパスワードが正しくありません。',
+    weakPassword: 'パスワードは6文字以上で入力してください。',
+    popupClosed: 'Googleログイン画面が閉じられました。',
+    unauthorizedDomain: 'Firebase Authenticationの承認済みドメインに現在のドメインを追加してください。',
+    missingEmail: 'パスワード再設定用のメールアドレスを入力してください。',
+    unknown: 'ログイン処理中に不明なエラーが発生しました。',
+    code: 'ログイン処理中にエラーが発生しました。',
+  },
+  ko: {
+    restricted: '이 계정은 이용이 제한되었습니다. 운영자에게 문의해주세요.',
+    emailInUse: '이미 가입된 이메일입니다.',
+    invalidEmail: '이메일 형식이 올바르지 않습니다.',
+    invalidCredential: '이메일 또는 비밀번호가 올바르지 않습니다.',
+    weakPassword: '비밀번호는 6자 이상으로 입력해주세요.',
+    popupClosed: 'Google 로그인 창이 닫혔습니다.',
+    unauthorizedDomain: 'Firebase Authentication의 승인된 도메인에 현재 도메인을 추가해주세요.',
+    missingEmail: '비밀번호 재설정 이메일을 입력해주세요.',
+    unknown: '로그인 처리 중 알 수 없는 오류가 발생했습니다.',
+    code: '로그인 처리 중 오류가 발생했습니다.',
+  },
+  en: {
+    restricted: 'This account has been restricted. Please contact the admin.',
+    emailInUse: 'This email is already registered.',
+    invalidEmail: 'The email format is invalid.',
+    invalidCredential: 'Email or password is incorrect.',
+    weakPassword: 'Password must be at least 6 characters.',
+    popupClosed: 'The Google login window was closed.',
+    unauthorizedDomain: 'Add the current domain to Firebase Authentication authorized domains.',
+    missingEmail: 'Enter an email address for password reset.',
+    unknown: 'An unknown login error occurred.',
+    code: 'An error occurred during login.',
+  },
+};
+
+export const getAuthErrorMessage = (error: unknown, language: keyof typeof authMessages = 'ko') => {
+  const messages = authMessages[language] ?? authMessages.ko;
   if (error instanceof Error && error.message.includes('Firebase 설정이 필요합니다')) {
     return error.message;
   }
 
   if (error instanceof Error && error.message.includes('이 계정은 이용이 제한')) {
-    return error.message;
+    return messages.restricted;
   }
 
   if (error instanceof FirebaseError) {
     switch (error.code) {
       case 'auth/email-already-in-use':
-        return '이미 가입된 이메일입니다.';
+        return messages.emailInUse;
       case 'auth/invalid-email':
-        return '이메일 형식이 올바르지 않습니다.';
+        return messages.invalidEmail;
       case 'auth/invalid-credential':
       case 'auth/user-not-found':
       case 'auth/wrong-password':
-        return '이메일 또는 비밀번호가 올바르지 않습니다.';
+        return messages.invalidCredential;
       case 'auth/weak-password':
-        return '비밀번호는 6자 이상으로 입력해주세요.';
+        return messages.weakPassword;
       case 'auth/popup-closed-by-user':
-        return 'Google 로그인 창이 닫혔습니다.';
+        return messages.popupClosed;
       case 'auth/unauthorized-domain':
-        return 'Firebase Authentication의 승인된 도메인에 현재 도메인을 추가해주세요.';
+        return messages.unauthorizedDomain;
       case 'auth/missing-email':
-        return '비밀번호 재설정 이메일을 입력해주세요.';
+        return messages.missingEmail;
       default:
-        return `로그인 처리 중 오류가 발생했습니다. (${error.code})`;
+        return `${messages.code} (${error.code})`;
     }
   }
 
-  return '로그인 처리 중 알 수 없는 오류가 발생했습니다.';
+  return messages.unknown;
 };

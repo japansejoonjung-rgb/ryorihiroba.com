@@ -42,7 +42,7 @@ export default function Header() {
     { label: t.recommended, href: "/" },
     { label: t.categories, href: "/categories" },
     { label: t.ranking, href: "/ranking" },
-    { label: t.column, href: "/" },
+    { label: t.column, href: "/recipes?query=作り置き" },
     { label: t.post, href: "/post" },
     { label: t.mypage, href: "/mypage" },
   ];

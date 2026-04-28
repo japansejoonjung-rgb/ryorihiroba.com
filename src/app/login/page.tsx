@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Loader2, Lock, LogIn, Mail, User, UserPlus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { getAuthErrorMessage, loginUser, registerUser, sendResetPasswordEmail } from "@/lib/authService";
 import { getFirebaseMissingKeys } from "@/lib/firebase";
 import { recoveryQuestions } from "@/lib/userService";
@@ -13,6 +14,7 @@ type AuthMode = "login" | "register";
 export default function LoginPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { language, t, recoveryQuestionName } = useLanguage();
   const [mode, setMode] = useState<AuthMode>("login");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -42,22 +44,22 @@ export default function LoginPage() {
     setSuccess("");
 
     if (!firebaseReady) {
-      setError(`Firebase 환경변수를 먼저 설정해주세요: ${missingKeys.join(", ")}`);
+      setError(`${t.firebaseRequired}: ${missingKeys.join(", ")}`);
       return;
     }
 
     if (mode === "register" && displayName.trim().length < 2) {
-      setError("닉네임은 2자 이상 입력해주세요.");
+      setError(t.nameTooShort);
       return;
     }
 
     if (mode === "register" && password !== passwordConfirm) {
-      setError("비밀번호가 일치하지 않습니다. 다시 입력해주세요.");
+      setError(t.passwordMismatch);
       return;
     }
 
     if (mode === "register" && recoveryAnswer.trim().length < 2) {
-      setError("비밀번호 확인 질문의 답을 입력해주세요.");
+      setError(t.recoveryRequired);
       return;
     }
 
@@ -65,13 +67,13 @@ export default function LoginPage() {
     try {
       if (mode === "register") {
         await registerUser(email.trim(), password, displayName.trim(), recoveryQuestion, recoveryAnswer.trim());
-        handleAuthSuccess("회원가입이 완료되었습니다.");
+        handleAuthSuccess(t.signupDone);
       } else {
         await loginUser(email.trim(), password);
-        handleAuthSuccess("로그인되었습니다.");
+        handleAuthSuccess(t.loginDone);
       }
     } catch (authError) {
-      setError(getAuthErrorMessage(authError));
+      setError(getAuthErrorMessage(authError, language));
     } finally {
       setSubmitting(false);
     }
@@ -83,17 +85,17 @@ export default function LoginPage() {
     setSuccess("");
 
     if (!firebaseReady) {
-      setError(`Firebase 환경변수를 먼저 설정해주세요: ${missingKeys.join(", ")}`);
+      setError(`${t.firebaseRequired}: ${missingKeys.join(", ")}`);
       return;
     }
 
     setResetting(true);
     try {
       await sendResetPasswordEmail(resetEmail.trim());
-      setSuccess("비밀번호 재설정 이메일을 보냈습니다. 메일함을 확인해주세요.");
+      setSuccess(t.resetSent);
       setShowReset(false);
     } catch (authError) {
-      setError(getAuthErrorMessage(authError));
+      setError(getAuthErrorMessage(authError, language));
     } finally {
       setResetting(false);
     }
@@ -105,12 +107,12 @@ export default function LoginPage() {
   return (
     <div className="mx-auto grid min-h-[70vh] max-w-6xl items-center gap-10 px-4 py-10 md:grid-cols-2">
       <section>
-        <p className="font-bold text-orange-500">Welcome</p>
-        <h1 className="mt-2 text-4xl font-black leading-tight">レシピ広場で、毎日の料理をもっと楽しく。</h1>
-        <p className="mt-5 leading-8 text-stone-500">お気に入りレシピの保存、投稿、コメント機能を使うにはログインしてください。</p>
+        <p className="font-bold text-orange-500">{t.welcome}</p>
+        <h1 className="mt-2 text-4xl font-black leading-tight">{t.loginHeroTitle}</h1>
+        <p className="mt-5 leading-8 text-stone-500">{t.loginHeroDesc}</p>
         <div className="mt-8 rounded-3xl bg-orange-50 p-6">
-          <h2 className="font-black text-orange-600">アカウント機能</h2>
-          <p className="mt-2 text-sm leading-6 text-stone-600">メールアドレスまたはGoogleアカウントでログインできます。</p>
+          <h2 className="font-black text-orange-600">{t.accountFeatures}</h2>
+          <p className="mt-2 text-sm leading-6 text-stone-600">{t.accountFeaturesDesc}</p>
         </div>
       </section>
 
@@ -120,31 +122,31 @@ export default function LoginPage() {
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-orange-100 text-orange-500">
               <User size={28} />
             </div>
-            <h2 className="mt-4 text-2xl font-black">ログイン中です</h2>
+            <h2 className="mt-4 text-2xl font-black">{t.loggedIn}</h2>
             <p className="mt-2 text-sm text-stone-500">{user.displayName || user.email}</p>
             <button
               type="button"
               onClick={() => router.push("/")}
               className="mt-6 inline-flex items-center justify-center rounded-full bg-orange-500 px-6 py-3 font-bold text-white hover:bg-orange-600"
             >
-              トップへ戻る
+              {t.backHome}
             </button>
           </div>
         ) : (
           <>
             <div className="grid grid-cols-2 rounded-full bg-orange-50 p-1">
               <button type="button" onClick={() => setMode("login")} className={`rounded-full py-3 text-sm font-bold transition ${mode === "login" ? activeClass : idleClass}`}>
-                ログイン
+                {t.login}
               </button>
               <button type="button" onClick={() => setMode("register")} className={`rounded-full py-3 text-sm font-bold transition ${mode === "register" ? activeClass : idleClass}`}>
-                会員登録
+                {t.signup}
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="mt-6 grid gap-5">
               {mode === "register" && (
                 <label className="grid gap-2">
-                  <span className="text-sm font-bold">ニックネーム</span>
+                  <span className="text-sm font-bold">{t.nickname}</span>
                   <div className="flex items-center rounded-2xl border border-orange-100 px-4 py-3 focus-within:border-orange-300">
                     <User size={18} className="text-orange-400" />
                     <input
@@ -159,7 +161,7 @@ export default function LoginPage() {
               )}
 
               <label className="grid gap-2">
-                <span className="text-sm font-bold">メールアドレス</span>
+                <span className="text-sm font-bold">{t.email}</span>
                 <div className="flex items-center rounded-2xl border border-orange-100 px-4 py-3 focus-within:border-orange-300">
                   <Mail size={18} className="text-orange-400" />
                   <input
@@ -174,7 +176,7 @@ export default function LoginPage() {
               </label>
 
               <label className="grid gap-2">
-                <span className="text-sm font-bold">パスワード</span>
+                <span className="text-sm font-bold">{t.password}</span>
                 <div className="flex items-center rounded-2xl border border-orange-100 px-4 py-3 focus-within:border-orange-300">
                   <Lock size={18} className="text-orange-400" />
                   <input
@@ -183,7 +185,7 @@ export default function LoginPage() {
                     type="password"
                     required
                     minLength={6}
-                    placeholder="6文字以上"
+                    placeholder={t.passwordMin}
                     className="ml-3 w-full bg-transparent outline-none"
                   />
                 </div>
@@ -192,7 +194,7 @@ export default function LoginPage() {
               {mode === "register" && (
                 <>
                   <label className="grid gap-2">
-                    <span className="text-sm font-bold">パスワード確認</span>
+                    <span className="text-sm font-bold">{t.passwordConfirm}</span>
                     <div className="flex items-center rounded-2xl border border-orange-100 px-4 py-3 focus-within:border-orange-300">
                       <Lock size={18} className="text-orange-400" />
                       <input
@@ -201,26 +203,26 @@ export default function LoginPage() {
                         type="password"
                         required
                         minLength={6}
-                        placeholder="もう一度入力"
+                        placeholder={t.passwordConfirmPlaceholder}
                         className="ml-3 w-full bg-transparent outline-none"
                       />
                     </div>
                   </label>
 
                   <label className="grid gap-2">
-                    <span className="text-sm font-bold">本人確認の質問</span>
+                    <span className="text-sm font-bold">{t.recoveryQuestion}</span>
                     <select value={recoveryQuestion} onChange={(event) => setRecoveryQuestion(event.target.value)} className="rounded-2xl border border-orange-100 px-4 py-3 outline-none focus:border-orange-300">
-                      {recoveryQuestions.map((question) => <option key={question.id} value={question.id}>{question.label}</option>)}
+                      {recoveryQuestions.map((question) => <option key={question.id} value={question.id}>{recoveryQuestionName(question.id)}</option>)}
                     </select>
                   </label>
 
                   <label className="grid gap-2">
-                    <span className="text-sm font-bold">質問の答え</span>
+                    <span className="text-sm font-bold">{t.recoveryAnswer}</span>
                     <input
                       value={recoveryAnswer}
                       onChange={(event) => setRecoveryAnswer(event.target.value)}
                       required
-                      placeholder="답변을 입력"
+                      placeholder={t.recoveryAnswerPlaceholder}
                       className="rounded-2xl border border-orange-100 px-4 py-3 outline-none focus:border-orange-300"
                     />
                   </label>
@@ -230,7 +232,7 @@ export default function LoginPage() {
               {!firebaseReady && (
                 <div className="flex gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">
                   <AlertCircle size={18} className="mt-0.5 shrink-0" />
-                  <p>Firebase 설정이 필요합니다. `.env.local`에 Firebase 웹 앱 정보를 넣고 서버를 다시 시작해주세요.</p>
+                  <p>{t.firebaseRequired}</p>
                 </div>
               )}
 
@@ -249,14 +251,14 @@ export default function LoginPage() {
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-orange-500 px-6 py-3 font-bold text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-stone-300"
               >
                 {submitting ? <Loader2 size={18} className="animate-spin" /> : mode === "register" ? <UserPlus size={18} /> : <LogIn size={18} />}
-                {mode === "register" ? "会員登録する" : "ログインする"}
+                {mode === "register" ? t.signupButton : t.loginButton}
               </button>
             </form>
 
             {mode === "login" && (
               <div className="mt-5 border-t border-orange-50 pt-5">
                 <button type="button" onClick={() => setShowReset((value) => !value)} className="text-sm font-bold text-orange-500 hover:text-orange-600">
-                  パスワードを忘れた場合
+                  {t.forgotPassword}
                 </button>
                 {showReset && (
                   <form onSubmit={handleResetPassword} className="mt-4 grid gap-3">
@@ -265,13 +267,13 @@ export default function LoginPage() {
                       onChange={(event) => setResetEmail(event.target.value)}
                       type="email"
                       required
-                      placeholder="登録メールアドレス"
+                      placeholder={t.resetEmailPlaceholder}
                       className="rounded-2xl border border-orange-100 px-4 py-3 outline-none focus:border-orange-300"
                     />
-                    <p className="text-xs leading-5 text-stone-500">本人確認の質問は運営確認用に保存されます。実際の再設定リンクは登録メールへ送信されます。</p>
+                    <p className="text-xs leading-5 text-stone-500">{t.resetNotice}</p>
                     <button disabled={resetting || !firebaseReady} className="inline-flex items-center justify-center gap-2 rounded-full border border-orange-200 px-5 py-3 text-sm font-bold text-orange-500 hover:bg-orange-50 disabled:cursor-not-allowed disabled:text-stone-400">
                       {resetting && <Loader2 size={16} className="animate-spin" />}
-                      再設定メールを送る
+                      {t.sendReset}
                     </button>
                   </form>
                 )}
@@ -279,7 +281,7 @@ export default function LoginPage() {
             )}
 
             <p className="mt-5 text-center text-sm text-stone-500">
-              {mode === "login" ? "アカウントをお持ちでない方は「会員登録」から始められます。" : "登録済みの方は「ログイン」へ切り替えてください。"}
+              {mode === "login" ? t.noAccountGuide : t.hasAccountGuide}
             </p>
           </>
         )}

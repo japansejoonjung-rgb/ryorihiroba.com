@@ -88,15 +88,22 @@ service cloud.firestore {
       allow read: if ownsExistingUserId() || isAdmin();
       allow create: if signedIn() &&
         request.resource.data.amount is int &&
-        request.resource.data.amount > 0 &&
+        request.resource.data.amount != 0 &&
         request.resource.data.keys().hasOnly(['userId', 'amount', 'type', 'sourceId', 'description', 'createdAt']) &&
         (
           (
             request.resource.data.type in ['signup', 'recipe_post'] &&
-            request.resource.data.userId == request.auth.uid
+            request.resource.data.userId == request.auth.uid &&
+            request.resource.data.amount > 0
           ) ||
-          request.resource.data.type == 'like_milestone' ||
-          isAdmin()
+          (
+            request.resource.data.type == 'like_milestone' &&
+            request.resource.data.amount > 0
+          ) ||
+          (
+            isAdmin() &&
+            request.resource.data.type == 'admin_adjustment'
+          )
         );
       allow update, delete: if isAdmin();
     }

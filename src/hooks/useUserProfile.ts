@@ -1,20 +1,42 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { UserProfile, getUserProfile } from "@/lib/userService";
 
 export function useUserProfile(uid?: string | null) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(Boolean(uid));
 
+  const loadProfile = useCallback(async (targetUid?: string | null) => {
+    if (!targetUid) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    return getUserProfile(targetUid)
+      .then((item) => {
+        setProfile(item);
+        return item;
+      })
+      .catch(() => {
+        setProfile(null);
+        return null;
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
   useEffect(() => {
+    let mounted = true;
     if (!uid) {
       setProfile(null);
       setLoading(false);
       return;
     }
 
-    let mounted = true;
     setLoading(true);
     getUserProfile(uid)
       .then((item) => {
@@ -32,5 +54,5 @@ export function useUserProfile(uid?: string | null) {
     };
   }, [uid]);
 
-  return { profile, loading };
+  return { profile, loading, refresh: () => loadProfile(uid) };
 }

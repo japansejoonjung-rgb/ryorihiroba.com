@@ -1,4 +1,5 @@
 import {
+  addDoc,
   collection,
   doc,
   getDoc,
@@ -112,6 +113,19 @@ export const getUserProfile = async (uid: string) => {
   return normalizeProfile(uid, profileSnap.data(), points);
 };
 
+export const getAllUserProfiles = async () => {
+  const db = getFirebaseDb();
+  const snapshot = await getDocs(collection(db, 'users'));
+
+  const profiles = await Promise.all(
+    snapshot.docs.map(async (profileDoc) =>
+      normalizeProfile(profileDoc.id, profileDoc.data(), await getUserPoints(profileDoc.id))
+    )
+  );
+
+  return profiles.sort((a, b) => a.email.localeCompare(b.email));
+};
+
 export const createUserProfile = async ({
   uid,
   email,
@@ -218,6 +232,35 @@ export const awardPointsOnce = async ({
   });
 
   return true;
+};
+
+export const createAdminPointAdjustment = async ({
+  adminId,
+  userId,
+  amount,
+  description,
+}: {
+  adminId: string;
+  userId: string;
+  amount: number;
+  description: string;
+}) => {
+  const normalizedAmount = Math.trunc(amount);
+  if (normalizedAmount === 0) {
+    throw new Error('포인트는 0이 아닌 숫자로 입력해주세요.');
+  }
+
+  const db = getFirebaseDb();
+  const docRef = await addDoc(collection(db, 'pointTransactions'), {
+    userId,
+    amount: normalizedAmount,
+    type: 'admin_adjustment',
+    sourceId: `${adminId}_${Date.now()}`,
+    description: description.trim() || '운영자 포인트 조정',
+    createdAt: new Date().toISOString(),
+  });
+
+  return docRef.id;
 };
 
 export const banUser = async (uid: string) => {

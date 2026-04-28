@@ -4,12 +4,14 @@ import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import RecipeDetail from "@/components/RecipeDetail";
+import { useLanguage } from "@/context/LanguageContext";
 import { recipes as sampleRecipes } from "@/data/recipes";
 import { getRecipeById } from "@/lib/firestoreService";
 import { Recipe } from "@/types/recipe";
 
 function RecipeDetailContent() {
   const searchParams = useSearchParams();
+  const { t } = useLanguage();
   const recipeId = searchParams.get("id") ?? "";
   const [recipe, setRecipe] = useState<Recipe | null>(() => sampleRecipes.find((item) => item.id === recipeId) ?? null);
   const [loading, setLoading] = useState(Boolean(recipeId) && !recipe);
@@ -53,16 +55,16 @@ function RecipeDetailContent() {
   }, [recipe]);
 
   if (loading) {
-    return <div className="mx-auto max-w-7xl px-4 py-10 font-bold text-stone-600">レシピを読み込み中です。</div>;
+    return <div className="mx-auto max-w-7xl px-4 py-10 font-bold text-stone-600">{t.recipeLoading}</div>;
   }
 
   if (!recipe) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <h1 className="text-3xl font-black">レシピが見つかりません</h1>
-        <p className="mt-3 leading-7 text-stone-500">削除されたか、URLが間違っている可能性があります。</p>
+        <h1 className="text-3xl font-black">{t.recipeNotFound}</h1>
+        <p className="mt-3 leading-7 text-stone-500">{t.recipeNotFoundDesc}</p>
         <Link href="/recipes" className="mt-6 inline-flex rounded-full bg-orange-500 px-6 py-3 font-bold text-white hover:bg-orange-600">
-          レシピ一覧へ
+          {t.goRecipeList}
         </Link>
       </div>
     );
@@ -73,7 +75,7 @@ function RecipeDetailContent() {
 
 export default function RecipeDetailPage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-7xl px-4 py-10 font-bold text-stone-600">レシピを読み込み中です。</div>}>
+    <Suspense fallback={<div className="mx-auto max-w-7xl px-4 py-10 font-bold text-stone-600">Loading...</div>}>
       <RecipeDetailContent />
     </Suspense>
   );
