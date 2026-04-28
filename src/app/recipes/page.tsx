@@ -19,7 +19,7 @@ function RecipesContent() {
     const matchesQuery = recipe.title.toLowerCase().includes(keyword) || recipe.description.toLowerCase().includes(keyword) || recipe.tags.some((tag) => tag.toLowerCase().includes(keyword)) || recipe.ingredients.some((item) => item.name.toLowerCase().includes(keyword));
     const matchesCategory = category ? recipe.category === category : true;
     return matchesQuery && matchesCategory;
-  }), [query, category]);
+  }), [recipes, query, category]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
