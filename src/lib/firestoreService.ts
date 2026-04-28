@@ -1,79 +1,141 @@
 import {
-  collection,
   addDoc,
-  getDocs,
-  getDoc,
-  updateDoc,
+  collection,
   deleteDoc,
   doc,
+  getDoc,
+  getDocs,
+  increment,
   query,
+  setDoc,
+  updateDoc,
   where,
 } from 'firebase/firestore';
 import { getFirebaseDb } from './firebase';
 import { Recipe } from '@/types/recipe';
+
+export type RecipeComment = {
+  id: string;
+  recipeId: string;
+  userId: string;
+  authorName: string;
+  authorAvatar: string;
+  text: string;
+  createdAt: string;
+  createdAtMs: number;
+};
+
+const defaultImage =
+  'https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=1200&q=80';
+
+const defaultAuthorAvatar = 'https://i.pravatar.cc/100?u=recipe-hiroba';
+
+const normalizeStringArray = (value: unknown) =>
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+
+const normalizeRecipe = (id: string, data: Record<string, any>): Recipe => ({
+  id,
+  title: String(data.title ?? 'タイトルなし'),
+  description: String(data.description ?? ''),
+  image: String(data.image || defaultImage),
+  time: Number(data.time ?? 20),
+  servings: Number(data.servings ?? 2),
+  difficulty: data.difficulty === '普通' || data.difficulty === '本格' ? data.difficulty : '簡単',
+  likes: Number(data.likes ?? 0),
+  views: Number(data.views ?? 0),
+  saves: Number(data.saves ?? 0),
+  authorId: typeof data.authorId === 'string' ? data.authorId : undefined,
+  author: {
+    name: String(data.author?.name ?? data.authorName ?? '料理好きユーザー'),
+    avatar: String(data.author?.avatar ?? data.authorAvatar ?? defaultAuthorAvatar),
+    bio: String(data.author?.bio ?? data.authorBio ?? 'レシピ広場の投稿者です。'),
+  },
+  category: String(data.category ?? '時短料理'),
+  tags: normalizeStringArray(data.tags),
+  ingredients: Array.isArray(data.ingredients)
+    ? data.ingredients.map((item) => ({
+        name: String(item?.name ?? ''),
+        amount: String(item?.amount ?? ''),
+      }))
+    : [],
+  steps: normalizeStringArray(data.steps),
+  tips: String(data.tips ?? ''),
+  createdAt: String(data.createdAt ?? new Date().toISOString()),
+});
+
+const activityDocId = (userId: string, recipeId: string) =>
+  `${encodeURIComponent(userId)}_${encodeURIComponent(recipeId)}`;
+
+const safeUpdateRecipeMetric = async (
+  recipeId: string,
+  field: 'likes' | 'saves' | 'views',
+  amount: number
+) => {
+  const db = getFirebaseDb();
+  const recipeRef = doc(db, 'recipes', recipeId);
+  const recipeSnap = await getDoc(recipeRef);
+
+  if (recipeSnap.exists()) {
+    try {
+      await updateDoc(recipeRef, {
+        [field]: increment(amount),
+        updatedAt: new Date().toISOString(),
+      });
+    } catch {
+      // Activity documents are the source of truth if metric updates are blocked by rules.
+    }
+  }
+};
 
 // 레시피 추가
 export const addRecipe = async (
   userId: string,
   recipeData: Omit<Recipe, 'id'>
 ) => {
-  try {
-    const db = getFirebaseDb();
-    const docRef = await addDoc(collection(db, 'recipes'), {
-      ...recipeData,
-      userId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    return docRef.id;
-  } catch (error) {
-    throw error;
-  }
+  const db = getFirebaseDb();
+  const now = new Date().toISOString();
+  const docRef = await addDoc(collection(db, 'recipes'), {
+    ...recipeData,
+    authorId: userId,
+    createdAt: recipeData.createdAt || now,
+    updatedAt: now,
+  });
+
+  return docRef.id;
 };
 
-// 모든 레시피 가져오기
+// 모든 사용자 레시피 가져오기
 export const getAllRecipes = async () => {
-  try {
-    const db = getFirebaseDb();
-    const querySnapshot = await getDocs(collection(db, 'recipes'));
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-  } catch (error) {
-    throw error;
-  }
+  const db = getFirebaseDb();
+  const querySnapshot = await getDocs(collection(db, 'recipes'));
+
+  return querySnapshot.docs
+    .map((recipeDoc) => normalizeRecipe(recipeDoc.id, recipeDoc.data()))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 };
 
 // 특정 레시피 가져오기
 export const getRecipeById = async (recipeId: string) => {
-  try {
-    const db = getFirebaseDb();
-    const docRef = doc(db, 'recipes', recipeId);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() };
-    } else {
-      throw new Error('레시피를 찾을 수 없습니다');
-    }
-  } catch (error) {
-    throw error;
+  const db = getFirebaseDb();
+  const docRef = doc(db, 'recipes', recipeId);
+  const docSnap = await getDoc(docRef);
+
+  if (!docSnap.exists()) {
+    throw new Error('레시피를 찾을 수 없습니다');
   }
+
+  return normalizeRecipe(docSnap.id, docSnap.data());
 };
 
 // 사용자의 레시피 가져오기
 export const getUserRecipes = async (userId: string) => {
-  try {
-    const db = getFirebaseDb();
-    const q = query(collection(db, 'recipes'), where('userId', '==', userId));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-  } catch (error) {
-    throw error;
-  }
+  const db = getFirebaseDb();
+  const recipesQuery = query(collection(db, 'recipes'), where('authorId', '==', userId));
+  const querySnapshot = await getDocs(recipesQuery);
+
+  return querySnapshot.docs
+    .map((recipeDoc) => normalizeRecipe(recipeDoc.id, recipeDoc.data()))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 };
 
 // 레시피 수정
@@ -81,66 +143,117 @@ export const updateRecipe = async (
   recipeId: string,
   recipeData: Partial<Recipe>
 ) => {
-  try {
-    const db = getFirebaseDb();
-    const docRef = doc(db, 'recipes', recipeId);
-    await updateDoc(docRef, {
-      ...recipeData,
-      updatedAt: new Date(),
-    });
-  } catch (error) {
-    throw error;
-  }
+  const db = getFirebaseDb();
+  const docRef = doc(db, 'recipes', recipeId);
+  await updateDoc(docRef, {
+    ...recipeData,
+    updatedAt: new Date().toISOString(),
+  });
 };
 
 // 레시피 삭제
 export const deleteRecipe = async (recipeId: string) => {
-  try {
-    const db = getFirebaseDb();
-    await deleteDoc(doc(db, 'recipes', recipeId));
-  } catch (error) {
-    throw error;
-  }
+  const db = getFirebaseDb();
+  await deleteDoc(doc(db, 'recipes', recipeId));
 };
 
-// 찜한 레시피 추가
-export const addFavorite = async (userId: string, recipeId: string) => {
-  try {
-    const db = getFirebaseDb();
-    await addDoc(collection(db, 'favorites'), {
-      userId,
-      recipeId,
-      createdAt: new Date(),
-    });
-  } catch (error) {
-    throw error;
-  }
+export const getRecipeActivityStatus = async (userId: string, recipeId: string) => {
+  const db = getFirebaseDb();
+  const likeSnap = await getDoc(doc(db, 'recipeLikes', activityDocId(userId, recipeId)));
+  const saveSnap = await getDoc(doc(db, 'favorites', activityDocId(userId, recipeId)));
+
+  return {
+    liked: likeSnap.exists(),
+    saved: saveSnap.exists(),
+  };
 };
 
-// 찜한 레시피 제거
-export const removeFavorite = async (userId: string, recipeId: string) => {
-  try {
-    const db = getFirebaseDb();
-    const q = query(
-      collection(db, 'favorites'),
-      where('userId', '==', userId),
-      where('recipeId', '==', recipeId)
-    );
-    const querySnapshot = await getDocs(q);
-    querySnapshot.docs.forEach((doc) => deleteDoc(doc.ref));
-  } catch (error) {
-    throw error;
+export const toggleRecipeLike = async (
+  userId: string,
+  recipeId: string,
+  currentValue: boolean
+) => {
+  const db = getFirebaseDb();
+  const likeRef = doc(db, 'recipeLikes', activityDocId(userId, recipeId));
+
+  if (currentValue) {
+    await deleteDoc(likeRef);
+    await safeUpdateRecipeMetric(recipeId, 'likes', -1);
+    return false;
   }
+
+  await setDoc(likeRef, {
+    userId,
+    recipeId,
+    createdAt: new Date().toISOString(),
+  });
+  await safeUpdateRecipeMetric(recipeId, 'likes', 1);
+  return true;
 };
 
-// 사용자의 찜한 레시피 가져오기
-export const getUserFavorites = async (userId: string) => {
-  try {
-    const db = getFirebaseDb();
-    const q = query(collection(db, 'favorites'), where('userId', '==', userId));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map((doc) => doc.data().recipeId);
-  } catch (error) {
-    throw error;
+export const toggleRecipeSave = async (
+  userId: string,
+  recipeId: string,
+  currentValue: boolean
+) => {
+  const db = getFirebaseDb();
+  const favoriteRef = doc(db, 'favorites', activityDocId(userId, recipeId));
+
+  if (currentValue) {
+    await deleteDoc(favoriteRef);
+    await safeUpdateRecipeMetric(recipeId, 'saves', -1);
+    return false;
   }
+
+  await setDoc(favoriteRef, {
+    userId,
+    recipeId,
+    createdAt: new Date().toISOString(),
+  });
+  await safeUpdateRecipeMetric(recipeId, 'saves', 1);
+  return true;
+};
+
+export const getRecipeComments = async (recipeId: string): Promise<RecipeComment[]> => {
+  const db = getFirebaseDb();
+  const commentsQuery = query(collection(db, 'comments'), where('recipeId', '==', recipeId));
+  const querySnapshot = await getDocs(commentsQuery);
+
+  return querySnapshot.docs
+    .map((commentDoc) => {
+      const data = commentDoc.data();
+      return {
+        id: commentDoc.id,
+        recipeId: String(data.recipeId ?? recipeId),
+        userId: String(data.userId ?? ''),
+        authorName: String(data.authorName ?? '料理好きユーザー'),
+        authorAvatar: String(data.authorAvatar ?? defaultAuthorAvatar),
+        text: String(data.text ?? ''),
+        createdAt: String(data.createdAt ?? new Date().toISOString()),
+        createdAtMs: Number(data.createdAtMs ?? 0),
+      };
+    })
+    .sort((a, b) => a.createdAtMs - b.createdAtMs);
+};
+
+export const addRecipeComment = async (
+  recipeId: string,
+  userId: string,
+  authorName: string,
+  authorAvatar: string,
+  text: string
+) => {
+  const db = getFirebaseDb();
+  const now = new Date();
+  const docRef = await addDoc(collection(db, 'comments'), {
+    recipeId,
+    userId,
+    authorName,
+    authorAvatar,
+    text,
+    createdAt: now.toISOString(),
+    createdAtMs: now.getTime(),
+  });
+
+  return docRef.id;
 };

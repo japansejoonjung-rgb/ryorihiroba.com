@@ -11,6 +11,7 @@ export type Recipe = {
   likes: number;
   views: number;
   saves: number;
+  authorId?: string;
   author: {
     name: string;
     avatar: string;

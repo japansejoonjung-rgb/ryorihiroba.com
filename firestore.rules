@@ -1,0 +1,45 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownsIncomingUserId() {
+      return signedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    function ownsExistingUserId() {
+      return signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /recipes/{recipeId} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
+      allow update: if signedIn() && (
+        resource.data.authorId == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'saves', 'views', 'updatedAt'])
+      );
+      allow delete: if signedIn() && resource.data.authorId == request.auth.uid;
+    }
+
+    match /recipeLikes/{likeId} {
+      allow read: if true;
+      allow create: if ownsIncomingUserId();
+      allow delete: if ownsExistingUserId();
+    }
+
+    match /favorites/{favoriteId} {
+      allow read: if signedIn();
+      allow create: if ownsIncomingUserId();
+      allow delete: if ownsExistingUserId();
+    }
+
+    match /comments/{commentId} {
+      allow read: if true;
+      allow create: if ownsIncomingUserId();
+      allow delete: if ownsExistingUserId();
+    }
+  }
+}

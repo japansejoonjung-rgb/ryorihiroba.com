@@ -2,8 +2,18 @@
 
 import { Recipe } from "@/types/recipe";
 import RecipeCard from "@/components/RecipeCard";
-import { Bookmark, Clock, Heart, Share2, Users } from "lucide-react";
-import { useState } from "react";
+import { Bookmark, Clock, Heart, Loader2, Share2, Users } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import {
+  addRecipeComment,
+  getRecipeActivityStatus,
+  getRecipeComments,
+  RecipeComment,
+  toggleRecipeLike,
+  toggleRecipeSave,
+} from "@/lib/firestoreService";
 
 type Props = {
   recipe: Recipe;
@@ -11,8 +21,64 @@ type Props = {
 };
 
 export default function RecipeDetail({ recipe, relatedRecipes }: Props) {
+  const router = useRouter();
+  const { user } = useAuth();
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [likeCount, setLikeCount] = useState(recipe.likes);
+  const [comments, setComments] = useState<RecipeComment[]>([]);
+  const [commentText, setCommentText] = useState("");
+  const [commentLoading, setCommentLoading] = useState(true);
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+
+  useEffect(() => {
+    setLikeCount(recipe.likes);
+  }, [recipe.likes]);
+
+  useEffect(() => {
+    if (!user) {
+      setLiked(false);
+      setSaved(false);
+      return;
+    }
+
+    let mounted = true;
+    getRecipeActivityStatus(user.uid, recipe.id)
+      .then((status) => {
+        if (!mounted) return;
+        setLiked(status.liked);
+        setSaved(status.saved);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setLiked(false);
+        setSaved(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [recipe.id, user]);
+
+  useEffect(() => {
+    let mounted = true;
+    setCommentLoading(true);
+
+    getRecipeComments(recipe.id)
+      .then((items) => {
+        if (mounted) setComments(items);
+      })
+      .catch(() => {
+        if (mounted) setComments([]);
+      })
+      .finally(() => {
+        if (mounted) setCommentLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [recipe.id]);
 
   const handleShare = async () => {
     if (navigator.share) {
@@ -20,6 +86,64 @@ export default function RecipeDetail({ recipe, relatedRecipes }: Props) {
     } else {
       await navigator.clipboard.writeText(window.location.href);
       alert("URLをコピーしました");
+    }
+  };
+
+  const handleLike = async () => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    const nextLiked = await toggleRecipeLike(user.uid, recipe.id, liked);
+    setLiked(nextLiked);
+    setLikeCount((count) => count + (nextLiked ? 1 : -1));
+  };
+
+  const handleSave = async () => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    const nextSaved = await toggleRecipeSave(user.uid, recipe.id, saved);
+    setSaved(nextSaved);
+  };
+
+  const handleCommentSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    const text = commentText.trim();
+    if (!text) return;
+
+    const authorName = user.displayName || user.email?.split("@")[0] || "料理好きユーザー";
+    const authorAvatar = user.photoURL || `https://i.pravatar.cc/100?u=${encodeURIComponent(user.uid)}`;
+    const now = new Date();
+
+    setCommentSubmitting(true);
+    try {
+      const id = await addRecipeComment(recipe.id, user.uid, authorName, authorAvatar, text);
+      setComments((items) => [
+        ...items,
+        {
+          id,
+          recipeId: recipe.id,
+          userId: user.uid,
+          authorName,
+          authorAvatar,
+          text,
+          createdAt: now.toISOString(),
+          createdAtMs: now.getTime(),
+        },
+      ]);
+      setCommentText("");
+    } finally {
+      setCommentSubmitting(false);
     }
   };
 
@@ -43,8 +167,8 @@ export default function RecipeDetail({ recipe, relatedRecipes }: Props) {
             <div className="rounded-2xl bg-orange-50 p-4 text-center"><span className="text-xl">🍳</span><p className="mt-2 text-sm font-bold">{recipe.difficulty}</p></div>
           </div>
           <div className="mt-6 flex flex-wrap gap-3">
-            <button onClick={() => setLiked((prev) => !prev)} className={`rounded-full px-5 py-3 text-sm font-bold ${liked ? "bg-rose-500 text-white" : "bg-rose-50 text-rose-500 hover:bg-rose-100"}`}><span className="inline-flex items-center gap-2"><Heart size={18} fill={liked ? "currentColor" : "none"} />いいね {recipe.likes + (liked ? 1 : 0)}</span></button>
-            <button onClick={() => setSaved((prev) => !prev)} className={`rounded-full px-5 py-3 text-sm font-bold ${saved ? "bg-orange-500 text-white" : "bg-orange-50 text-orange-500 hover:bg-orange-100"}`}><span className="inline-flex items-center gap-2"><Bookmark size={18} fill={saved ? "currentColor" : "none"} />保存</span></button>
+            <button onClick={handleLike} className={`rounded-full px-5 py-3 text-sm font-bold ${liked ? "bg-rose-500 text-white" : "bg-rose-50 text-rose-500 hover:bg-rose-100"}`}><span className="inline-flex items-center gap-2"><Heart size={18} fill={liked ? "currentColor" : "none"} />いいね {likeCount}</span></button>
+            <button onClick={handleSave} className={`rounded-full px-5 py-3 text-sm font-bold ${saved ? "bg-orange-500 text-white" : "bg-orange-50 text-orange-500 hover:bg-orange-100"}`}><span className="inline-flex items-center gap-2"><Bookmark size={18} fill={saved ? "currentColor" : "none"} />保存</span></button>
             <button onClick={handleShare} className="rounded-full bg-stone-100 px-5 py-3 text-sm font-bold text-stone-600 hover:bg-stone-200"><span className="inline-flex items-center gap-2"><Share2 size={18} />共有</span></button>
           </div>
         </div>
@@ -62,7 +186,37 @@ export default function RecipeDetail({ recipe, relatedRecipes }: Props) {
       </section>
       <section className="mt-10 rounded-3xl border border-orange-100 bg-white p-6 shadow-sm">
         <h2 className="text-2xl font-black">コメント</h2>
-        <div className="mt-5 grid gap-4"><div className="rounded-2xl bg-stone-50 p-4"><p className="font-bold">料理好きユーザー</p><p className="mt-2 text-sm leading-6 text-stone-600">家族に好評でした。次は具材を少し増やして作ってみます。</p></div><textarea placeholder="コメントを書く" className="min-h-28 rounded-2xl border border-orange-100 p-4 outline-none focus:border-orange-300" /><button className="w-fit rounded-full bg-orange-500 px-6 py-3 text-sm font-bold text-white hover:bg-orange-600">コメント投稿</button></div>
+        <div className="mt-5 grid gap-4">
+          {commentLoading ? (
+            <div className="flex items-center gap-2 rounded-2xl bg-stone-50 p-4 text-sm font-semibold text-stone-500">
+              <Loader2 size={18} className="animate-spin" />
+              コメントを読み込み中です。
+            </div>
+          ) : comments.length > 0 ? (
+            comments.map((comment) => (
+              <div key={comment.id} className="rounded-2xl bg-stone-50 p-4">
+                <div className="flex items-center gap-3">
+                  <img src={comment.authorAvatar} alt={comment.authorName} className="h-9 w-9 rounded-full" />
+                  <div>
+                    <p className="font-bold">{comment.authorName}</p>
+                    <p className="text-xs text-stone-400">{new Date(comment.createdAt).toLocaleDateString("ja-JP")}</p>
+                  </div>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-stone-600">{comment.text}</p>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-2xl bg-stone-50 p-4 text-sm font-semibold text-stone-500">最初のコメントを書いてみましょう。</div>
+          )}
+
+          <form onSubmit={handleCommentSubmit} className="grid gap-3">
+            <textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder={user ? "コメントを書く" : "ログインするとコメントできます"} className="min-h-28 rounded-2xl border border-orange-100 p-4 outline-none focus:border-orange-300" />
+            <button disabled={commentSubmitting || !commentText.trim()} className="inline-flex w-fit items-center gap-2 rounded-full bg-orange-500 px-6 py-3 text-sm font-bold text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-stone-300">
+              {commentSubmitting && <Loader2 size={16} className="animate-spin" />}
+              コメント投稿
+            </button>
+          </form>
+        </div>
       </section>
       <section className="mt-12"><h2 className="text-2xl font-black">関連レシピ</h2><div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{relatedRecipes.map((item) => <RecipeCard key={item.id} recipe={item} />)}</div></section>
     </div>
