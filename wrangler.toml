@@ -1,0 +1,21 @@
+name = "recipe-hiroba"
+type = "javascript"
+account_id = "YOUR_ACCOUNT_ID"
+workers_dev = true
+routes = []
+zones = []
+
+[env.production]
+name = "recipe-hiroba-prod"
+
+[build]
+command = "npm run build"
+cwd = "./"
+watch_paths = ["src/**/*.tsx", "src/**/*.ts"]
+
+[build.upload]
+format = "service-worker"
+
+[[env.production.routes]]
+pattern = "example.com/*"
+zone_id = "YOUR_ZONE_ID"

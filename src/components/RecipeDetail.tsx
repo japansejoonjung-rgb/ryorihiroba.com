@@ -1,0 +1,70 @@
+"use client";
+
+import { Recipe } from "@/types/recipe";
+import RecipeCard from "@/components/RecipeCard";
+import { Bookmark, Clock, Heart, Share2, Users } from "lucide-react";
+import { useState } from "react";
+
+type Props = {
+  recipe: Recipe;
+  relatedRecipes: Recipe[];
+};
+
+export default function RecipeDetail({ recipe, relatedRecipes }: Props) {
+  const [liked, setLiked] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      await navigator.share({ title: recipe.title, text: recipe.description, url: window.location.href });
+    } else {
+      await navigator.clipboard.writeText(window.location.href);
+      alert("URLをコピーしました");
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8">
+      <section className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="overflow-hidden rounded-3xl bg-white shadow-sm">
+          <img src={recipe.image} alt={recipe.title} className="h-[280px] w-full object-cover md:h-[460px]" />
+        </div>
+        <div className="rounded-3xl border border-orange-100 bg-white p-6 shadow-sm">
+          <div className="mb-3 inline-flex rounded-full bg-orange-50 px-4 py-2 text-sm font-bold text-orange-500">{recipe.category}</div>
+          <h1 className="text-3xl font-black leading-tight text-stone-900 md:text-4xl">{recipe.title}</h1>
+          <p className="mt-4 leading-7 text-stone-600">{recipe.description}</p>
+          <div className="mt-6 flex items-center gap-3">
+            <img src={recipe.author.avatar} alt={recipe.author.name} className="h-12 w-12 rounded-full" />
+            <div><p className="font-bold">{recipe.author.name}</p><p className="text-sm text-stone-500">{recipe.author.bio}</p></div>
+          </div>
+          <div className="mt-6 grid grid-cols-3 gap-3">
+            <div className="rounded-2xl bg-orange-50 p-4 text-center"><Clock className="mx-auto text-orange-500" size={22} /><p className="mt-2 text-sm font-bold">{recipe.time}分</p></div>
+            <div className="rounded-2xl bg-orange-50 p-4 text-center"><Users className="mx-auto text-orange-500" size={22} /><p className="mt-2 text-sm font-bold">{recipe.servings}人分</p></div>
+            <div className="rounded-2xl bg-orange-50 p-4 text-center"><span className="text-xl">🍳</span><p className="mt-2 text-sm font-bold">{recipe.difficulty}</p></div>
+          </div>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button onClick={() => setLiked((prev) => !prev)} className={`rounded-full px-5 py-3 text-sm font-bold ${liked ? "bg-rose-500 text-white" : "bg-rose-50 text-rose-500 hover:bg-rose-100"}`}><span className="inline-flex items-center gap-2"><Heart size={18} fill={liked ? "currentColor" : "none"} />いいね {recipe.likes + (liked ? 1 : 0)}</span></button>
+            <button onClick={() => setSaved((prev) => !prev)} className={`rounded-full px-5 py-3 text-sm font-bold ${saved ? "bg-orange-500 text-white" : "bg-orange-50 text-orange-500 hover:bg-orange-100"}`}><span className="inline-flex items-center gap-2"><Bookmark size={18} fill={saved ? "currentColor" : "none"} />保存</span></button>
+            <button onClick={handleShare} className="rounded-full bg-stone-100 px-5 py-3 text-sm font-bold text-stone-600 hover:bg-stone-200"><span className="inline-flex items-center gap-2"><Share2 size={18} />共有</span></button>
+          </div>
+        </div>
+      </section>
+      <section className="mt-10 grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
+        <div className="rounded-3xl border border-orange-100 bg-white p-6 shadow-sm">
+          <h2 className="text-2xl font-black">材料</h2><p className="mt-1 text-sm text-stone-500">{recipe.servings}人分</p>
+          <div className="mt-5 grid gap-3">{recipe.ingredients.map((item) => <div key={item.name} className="flex justify-between border-b border-orange-50 pb-3 text-sm"><span className="font-medium">{item.name}</span><span className="text-stone-500">{item.amount}</span></div>)}</div>
+        </div>
+        <div className="rounded-3xl border border-orange-100 bg-white p-6 shadow-sm">
+          <h2 className="text-2xl font-black">作り方</h2>
+          <div className="mt-6 grid gap-5">{recipe.steps.map((step, index) => <div key={step} className="flex gap-4"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-500 font-black text-white">{index + 1}</div><p className="leading-7 text-stone-700">{step}</p></div>)}</div>
+          <div className="mt-8 rounded-2xl bg-orange-50 p-5"><h3 className="font-black text-orange-600">おいしく作るコツ</h3><p className="mt-2 leading-7 text-stone-600">{recipe.tips}</p></div>
+        </div>
+      </section>
+      <section className="mt-10 rounded-3xl border border-orange-100 bg-white p-6 shadow-sm">
+        <h2 className="text-2xl font-black">コメント</h2>
+        <div className="mt-5 grid gap-4"><div className="rounded-2xl bg-stone-50 p-4"><p className="font-bold">料理好きユーザー</p><p className="mt-2 text-sm leading-6 text-stone-600">家族に好評でした。次は具材を少し増やして作ってみます。</p></div><textarea placeholder="コメントを書く" className="min-h-28 rounded-2xl border border-orange-100 p-4 outline-none focus:border-orange-300" /><button className="w-fit rounded-full bg-orange-500 px-6 py-3 text-sm font-bold text-white hover:bg-orange-600">コメント投稿</button></div>
+      </section>
+      <section className="mt-12"><h2 className="text-2xl font-black">関連レシピ</h2><div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{relatedRecipes.map((item) => <RecipeCard key={item.id} recipe={item} />)}</div></section>
+    </div>
+  );
+}
