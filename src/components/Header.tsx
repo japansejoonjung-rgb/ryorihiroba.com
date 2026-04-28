@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CircleUserRound, Coins, LogOut, Search, Menu, X } from "lucide-react";
+import { CircleUserRound, Coins, Globe2, LogOut, Search, Menu, X } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { Language, useLanguage } from "@/context/LanguageContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { logoutUser } from "@/lib/authService";
 
@@ -12,8 +13,10 @@ export default function Header() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const { profile } = useUserProfile(user?.uid);
+  const { language, setLanguage, t } = useLanguage();
   const [keyword, setKeyword] = useState("");
   const [open, setOpen] = useState(false);
+  const [languageOpen, setLanguageOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const handleSearch = (e: FormEvent) => {
@@ -34,25 +37,45 @@ export default function Header() {
   };
 
   const navItems = [
-    { label: "おすすめ", href: "/" },
-    { label: "カテゴリー", href: "/categories" },
-    { label: "ランキング", href: "/ranking" },
-    { label: "コラム", href: "/" },
-    { label: "レシピ投稿", href: "/post" },
-    { label: "マイページ", href: "/mypage" },
+    { label: t.recommended, href: "/" },
+    { label: t.categories, href: "/categories" },
+    { label: t.ranking, href: "/ranking" },
+    { label: t.column, href: "/" },
+    { label: t.post, href: "/post" },
+    { label: t.mypage, href: "/mypage" },
+  ];
+
+  const languageItems: { label: string; value: Language }[] = [
+    { label: "日本語", value: "ja" },
+    { label: "한국어", value: "ko" },
+    { label: "English", value: "en" },
   ];
 
   return (
     <header className="sticky top-0 z-50 border-b border-orange-100 bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
-        <Link href="/" className="text-2xl font-black tracking-tight text-orange-500">レシピ広場</Link>
+        <Link href="/" className="text-2xl font-black tracking-tight text-orange-500">{t.brand}</Link>
         <form onSubmit={handleSearch} className="hidden flex-1 items-center rounded-full border border-orange-100 bg-orange-50 px-4 py-2 md:flex">
           <Search size={18} className="text-orange-400" />
-          <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="料理名・食材で検索" className="ml-2 w-full bg-transparent text-sm outline-none placeholder:text-stone-400" />
+          <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder={t.searchPlaceholder} className="ml-2 w-full bg-transparent text-sm outline-none placeholder:text-stone-400" />
         </form>
         <nav className="hidden items-center gap-5 text-sm font-medium text-stone-700 lg:flex">
           {navItems.map((item) => <Link key={item.label} href={item.href} className="hover:text-orange-500">{item.label}</Link>)}
         </nav>
+        <div className="relative hidden md:block">
+          <button type="button" onClick={() => setLanguageOpen((value) => !value)} className="rounded-full border border-orange-100 p-2 text-stone-600 hover:bg-orange-50" aria-label="language">
+            <Globe2 size={20} />
+          </button>
+          {languageOpen && (
+            <div className="absolute right-0 mt-2 w-36 overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-lg">
+              {languageItems.map((item) => (
+                <button key={item.value} type="button" onClick={() => { setLanguage(item.value); setLanguageOpen(false); }} className={`block w-full px-4 py-3 text-left text-sm font-bold ${language === item.value ? "bg-orange-50 text-orange-500" : "text-stone-600 hover:bg-orange-50"}`}>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {!loading && (
           <div className="hidden items-center gap-2 md:flex">
             {user ? (
@@ -72,13 +95,13 @@ export default function Header() {
                   className="inline-flex items-center gap-1 rounded-full border border-orange-200 px-4 py-2 text-sm font-semibold text-orange-500 hover:bg-orange-50 disabled:cursor-not-allowed disabled:text-stone-400"
                 >
                   <LogOut size={16} />
-                  ログアウト
+                  {t.logout}
                 </button>
               </>
             ) : (
               <>
-                <Link href="/login" className="rounded-full border border-orange-200 px-4 py-2 text-sm font-semibold text-orange-500 hover:bg-orange-50">ログイン</Link>
-                <Link href="/login" className="rounded-full bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600">会員登録</Link>
+                <Link href="/login" className="rounded-full border border-orange-200 px-4 py-2 text-sm font-semibold text-orange-500 hover:bg-orange-50">{t.login}</Link>
+                <Link href="/login" className="rounded-full bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600">{t.signup}</Link>
               </>
             )}
           </div>
@@ -91,8 +114,15 @@ export default function Header() {
         <div className="border-t border-orange-100 bg-white px-4 py-4 md:hidden">
           <form onSubmit={handleSearch} className="mb-4 flex items-center rounded-full border border-orange-100 bg-orange-50 px-4 py-2">
             <Search size={18} className="text-orange-400" />
-            <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="料理名・食材で検索" className="ml-2 w-full bg-transparent text-sm outline-none" />
+            <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder={t.searchPlaceholder} className="ml-2 w-full bg-transparent text-sm outline-none" />
           </form>
+          <div className="mb-4 grid grid-cols-3 gap-2">
+            {languageItems.map((item) => (
+              <button key={item.value} type="button" onClick={() => setLanguage(item.value)} className={`rounded-full px-3 py-2 text-xs font-bold ${language === item.value ? "bg-orange-500 text-white" : "bg-orange-50 text-orange-500"}`}>
+                {item.label}
+              </button>
+            ))}
+          </div>
           <nav className="grid gap-3 text-sm font-semibold">
             {navItems.map((item) => <Link key={item.label} href={item.href} onClick={() => setOpen(false)} className="rounded-xl px-3 py-2 hover:bg-orange-50">{item.label}</Link>)}
           </nav>
@@ -115,13 +145,13 @@ export default function Header() {
                     className="inline-flex items-center justify-center gap-2 rounded-full border border-orange-200 px-4 py-3 text-sm font-bold text-orange-500 disabled:cursor-not-allowed disabled:text-stone-400"
                   >
                     <LogOut size={16} />
-                    ログアウト
+                    {t.logout}
                   </button>
                 </>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
-                  <Link href="/login" onClick={() => setOpen(false)} className="rounded-full border border-orange-200 px-4 py-3 text-center text-sm font-bold text-orange-500">ログイン</Link>
-                  <Link href="/login" onClick={() => setOpen(false)} className="rounded-full bg-orange-500 px-4 py-3 text-center text-sm font-bold text-white">会員登録</Link>
+                  <Link href="/login" onClick={() => setOpen(false)} className="rounded-full border border-orange-200 px-4 py-3 text-center text-sm font-bold text-orange-500">{t.login}</Link>
+                  <Link href="/login" onClick={() => setOpen(false)} className="rounded-full bg-orange-500 px-4 py-3 text-center text-sm font-bold text-white">{t.signup}</Link>
                 </div>
               )}
             </div>

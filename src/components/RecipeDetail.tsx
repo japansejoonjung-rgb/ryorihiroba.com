@@ -12,6 +12,7 @@ import {
   deleteRecipe,
   getRecipeActivityStatus,
   getRecipeComments,
+  recordRecipeView,
   RecipeComment,
   toggleRecipeLike,
   toggleRecipeSave,
@@ -34,10 +35,24 @@ export default function RecipeDetail({ recipe, relatedRecipes }: Props) {
   const [commentText, setCommentText] = useState("");
   const [commentLoading, setCommentLoading] = useState(true);
   const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [viewCount, setViewCount] = useState(recipe.views);
 
   useEffect(() => {
     setLikeCount(recipe.likes);
+    setViewCount(recipe.views);
   }, [recipe.likes]);
+
+  useEffect(() => {
+    const storageKey = "recipe-hiroba-visitor-id";
+    const visitorId = user?.uid || localStorage.getItem(storageKey) || crypto.randomUUID();
+    localStorage.setItem(storageKey, visitorId);
+
+    recordRecipeView(recipe.id, visitorId)
+      .then((recorded) => {
+        if (recorded) setViewCount((count) => count + 1);
+      })
+      .catch(() => undefined);
+  }, [recipe.id, user?.uid]);
 
   useEffect(() => {
     if (!user) {
@@ -187,7 +202,7 @@ export default function RecipeDetail({ recipe, relatedRecipes }: Props) {
           <div className="mt-6 grid grid-cols-3 gap-3">
             <div className="rounded-2xl bg-orange-50 p-4 text-center"><Clock className="mx-auto text-orange-500" size={22} /><p className="mt-2 text-sm font-bold">{recipe.time}分</p></div>
             <div className="rounded-2xl bg-orange-50 p-4 text-center"><Users className="mx-auto text-orange-500" size={22} /><p className="mt-2 text-sm font-bold">{recipe.servings}人分</p></div>
-            <div className="rounded-2xl bg-orange-50 p-4 text-center"><span className="text-xl">🍳</span><p className="mt-2 text-sm font-bold">{recipe.difficulty}</p></div>
+            <div className="rounded-2xl bg-orange-50 p-4 text-center"><span className="text-xl">👁</span><p className="mt-2 text-sm font-bold">{viewCount.toLocaleString()} views</p></div>
           </div>
           <div className="mt-6 flex flex-wrap gap-3">
             <button onClick={handleLike} className={`rounded-full px-5 py-3 text-sm font-bold ${liked ? "bg-rose-500 text-white" : "bg-rose-50 text-rose-500 hover:bg-rose-100"}`}><span className="inline-flex items-center gap-2"><Heart size={18} fill={liked ? "currentColor" : "none"} />いいね {likeCount}</span></button>

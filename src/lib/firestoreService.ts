@@ -88,12 +88,14 @@ const safeUpdateRecipeMetric = async (
   }
 };
 
-const getRecipeAuthorId = async (recipeId: string) => {
+const getRecipeSnapshotData = async (recipeId: string) => {
   const db = getFirebaseDb();
   const recipeSnap = await getDoc(doc(db, 'recipes', recipeId));
-  const authorId = recipeSnap.exists() ? recipeSnap.data().authorId : undefined;
-  return typeof authorId === 'string' ? authorId : undefined;
+  return recipeSnap.exists() ? recipeSnap.data() : null;
 };
+
+const visitorDocId = (visitorId: string, recipeId: string) =>
+  `${encodeURIComponent(visitorId)}_${encodeURIComponent(recipeId)}`;
 
 // 레시피 추가
 export const addRecipe = async (
@@ -112,7 +114,7 @@ export const addRecipe = async (
   try {
     await awardPointsOnce({
       userId,
-      amount: 20,
+      amount: 10,
       type: 'recipe_post',
       sourceId: docRef.id,
       description: '레시피投稿 포인트',
@@ -209,21 +211,41 @@ export const toggleRecipeLike = async (
   });
   await safeUpdateRecipeMetric(recipeId, 'likes', 1);
 
-  const authorId = await getRecipeAuthorId(recipeId);
+  const recipeData = await getRecipeSnapshotData(recipeId);
+  const authorId = typeof recipeData?.authorId === 'string' ? recipeData.authorId : undefined;
   if (authorId && authorId !== userId) {
-    try {
-      await awardPointsOnce({
-        userId: authorId,
-        amount: 5,
-        type: 'like_received',
-        sourceId: `${recipeId}_${userId}`,
-        description: '추천을 받은 레시피 포인트',
-      });
-    } catch {
-      // Likes still count even if point rules are not ready yet.
+    const currentLikes = Number(recipeData?.likes ?? 0) + 1;
+    if (currentLikes % 100 === 0) {
+      try {
+        await awardPointsOnce({
+          userId: authorId,
+          amount: 10,
+          type: 'like_milestone',
+          sourceId: `${recipeId}_${currentLikes}`,
+          description: `추천 ${currentLikes}개 달성 포인트`,
+        });
+      } catch {
+        // Likes still count even if point rules are not ready yet.
+      }
     }
   }
 
+  return true;
+};
+
+export const recordRecipeView = async (recipeId: string, visitorId: string) => {
+  const db = getFirebaseDb();
+  const viewRef = doc(db, 'recipeViews', visitorDocId(visitorId, recipeId));
+  const viewSnap = await getDoc(viewRef);
+
+  if (viewSnap.exists()) return false;
+
+  await setDoc(viewRef, {
+    recipeId,
+    visitorId,
+    createdAt: new Date().toISOString(),
+  });
+  await safeUpdateRecipeMetric(recipeId, 'views', 1);
   return true;
 };
 

@@ -76,6 +76,14 @@ service cloud.firestore {
       allow delete: if ownsExistingUserId() || isAdmin();
     }
 
+    match /recipeViews/{viewId} {
+      allow read: if isAdmin();
+      allow create: if request.resource.data.keys().hasOnly(['recipeId', 'visitorId', 'createdAt']) &&
+        request.resource.data.recipeId is string &&
+        request.resource.data.visitorId is string;
+      allow update, delete: if isAdmin();
+    }
+
     match /pointTransactions/{transactionId} {
       allow read: if ownsExistingUserId() || isAdmin();
       allow create: if signedIn() &&
@@ -87,7 +95,7 @@ service cloud.firestore {
             request.resource.data.type in ['signup', 'recipe_post'] &&
             request.resource.data.userId == request.auth.uid
           ) ||
-          request.resource.data.type == 'like_received' ||
+          request.resource.data.type == 'like_milestone' ||
           isAdmin()
         );
       allow update, delete: if isAdmin();

@@ -27,7 +27,7 @@ export type UserProfile = {
   updatedAt: string;
 };
 
-export type PointType = 'signup' | 'recipe_post' | 'like_received' | 'admin_adjustment';
+export type PointType = 'signup' | 'recipe_post' | 'like_milestone' | 'admin_adjustment';
 
 export type PointTransaction = {
   id: string;
@@ -94,7 +94,7 @@ export const getPointTransactions = async (uid: string): Promise<PointTransactio
         id: item.id,
         userId: String(data.userId ?? uid),
         amount: Number(data.amount ?? 0),
-        type: (data.type === 'recipe_post' || data.type === 'like_received' || data.type === 'admin_adjustment') ? data.type : 'signup',
+        type: (data.type === 'recipe_post' || data.type === 'like_milestone' || data.type === 'admin_adjustment') ? data.type : 'signup',
         sourceId: String(data.sourceId ?? ''),
         description: String(data.description ?? ''),
         createdAt: String(data.createdAt ?? new Date().toISOString()),
