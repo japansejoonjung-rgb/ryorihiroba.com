@@ -2,11 +2,17 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Coins, Loader2, Pencil, Trash2 } from "lucide-react";
+import { Coins, Loader2, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import RecipeCard from "@/components/RecipeCard";
-import { deleteRecipe, getUserRecipes } from "@/lib/firestoreService";
+import {
+  deleteRecipe,
+  DeletedRecipe,
+  getDeletedRecipesForUser,
+  getUserRecipes,
+  restoreDeletedRecipe,
+} from "@/lib/firestoreService";
 import {
   createAdminPointAdjustment,
   getAllUserProfiles,
@@ -22,6 +28,7 @@ export default function MyPage() {
   const { t } = useLanguage();
   const { profile, refresh: refreshProfile } = useUserProfile(user?.uid);
   const [myRecipes, setMyRecipes] = useState<Recipe[]>([]);
+  const [deletedRecipes, setDeletedRecipes] = useState<DeletedRecipe[]>([]);
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
@@ -38,22 +45,30 @@ export default function MyPage() {
     if (!user) {
       setMyRecipes([]);
       setTransactions([]);
+      setDeletedRecipes([]);
       setPageLoading(false);
       return;
     }
 
     let mounted = true;
     setPageLoading(true);
-    Promise.all([getUserRecipes(user.uid), getPointTransactions(user.uid)])
-      .then(([recipes, pointItems]) => {
+    const isAdminUser = profile?.role === "admin";
+    Promise.all([
+      getUserRecipes(user.uid),
+      getPointTransactions(user.uid),
+      getDeletedRecipesForUser(user.uid, isAdminUser),
+    ])
+      .then(([recipes, pointItems, deletedItems]) => {
         if (!mounted) return;
         setMyRecipes(recipes);
         setTransactions(pointItems);
+        setDeletedRecipes(deletedItems);
       })
       .catch(() => {
         if (!mounted) return;
         setMyRecipes([]);
         setTransactions([]);
+        setDeletedRecipes([]);
       })
       .finally(() => {
         if (mounted) setPageLoading(false);
@@ -62,7 +77,7 @@ export default function MyPage() {
     return () => {
       mounted = false;
     };
-  }, [user]);
+  }, [profile?.role, user]);
 
   useEffect(() => {
     if (!user || profile?.role !== "admin") return;
@@ -105,14 +120,45 @@ export default function MyPage() {
     setAllUsers(users);
   };
 
+  const reloadRecipes = async () => {
+    if (!user) return;
+    const [recipes, deletedItems] = await Promise.all([
+      getUserRecipes(user.uid),
+      getDeletedRecipesForUser(user.uid, profile?.role === "admin"),
+    ]);
+    setMyRecipes(recipes);
+    setDeletedRecipes(deletedItems);
+  };
+
   const handleDelete = async (recipeId: string) => {
+    if (!user) return;
+
     const confirmed = window.confirm(t.deleteConfirm);
     if (!confirmed) return;
 
     setDeletingId(recipeId);
     try {
-      await deleteRecipe(recipeId, { hideEverywhere: profile?.role === "admin" });
-      setMyRecipes((items) => items.filter((item) => item.id !== recipeId));
+      const recipe = myRecipes.find((item) => item.id === recipeId);
+      await deleteRecipe(recipeId, {
+        deletedBy: user.uid,
+        recipe,
+      });
+      await reloadRecipes();
+    } finally {
+      setDeletingId("");
+    }
+  };
+
+  const handleRestore = async (recipeId: string) => {
+    setDeletingId(recipeId);
+    setAdminMessage("");
+    setAdminError("");
+    try {
+      await restoreDeletedRecipe(recipeId);
+      await reloadRecipes();
+      setAdminMessage(t.restoreDone);
+    } catch {
+      setAdminError(t.restoreFailed);
     } finally {
       setDeletingId("");
     }
@@ -173,6 +219,8 @@ export default function MyPage() {
         <p className="font-bold text-orange-500">My Page</p>
         <h1 className="mt-2 text-3xl font-black">{t.myPage}</h1>
       </div>
+      {adminMessage && <p className="mb-5 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{adminMessage}</p>}
+      {adminError && <p className="mb-5 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-600">{adminError}</p>}
 
       <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
         <div className="rounded-3xl border border-orange-100 bg-white p-6 shadow-sm">
@@ -243,8 +291,6 @@ export default function MyPage() {
               </button>
             </form>
           )}
-          {adminMessage && <p className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{adminMessage}</p>}
-          {adminError && <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-600">{adminError}</p>}
         </section>
       )}
 
@@ -279,6 +325,47 @@ export default function MyPage() {
           <div className="rounded-3xl border border-orange-100 bg-white p-10 text-center shadow-sm">
             <p className="font-bold text-stone-600">{t.noMyRecipes}</p>
             <Link href="/post" className="mt-5 inline-flex rounded-full bg-orange-500 px-6 py-3 font-bold text-white hover:bg-orange-600">{t.firstRecipePost}</Link>
+          </div>
+        )}
+      </section>
+
+      <section className="mt-10">
+        <div className="mb-5">
+          <p className="font-bold text-orange-500">Deleted</p>
+          <h2 className="text-2xl font-black">{t.deletedRecipes}</h2>
+          <p className="mt-2 text-sm text-stone-500">{t.deletedRecipesDesc}</p>
+        </div>
+
+        {deletedRecipes.length > 0 ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {deletedRecipes.map((item) => (
+              <article key={item.id} className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
+                <div className="relative h-40 bg-stone-100">
+                  <img src={item.recipe.image} alt={item.recipe.title} className="h-full w-full object-cover grayscale" />
+                  <span className="absolute left-3 top-3 rounded-full bg-stone-900/80 px-3 py-1 text-xs font-bold text-white">{t.deletedRecipes}</span>
+                </div>
+                <div className="p-5">
+                  <h3 className="line-clamp-2 font-black">{item.recipe.title}</h3>
+                  <div className="mt-3 grid gap-1 text-xs text-stone-500">
+                    <p>{t.deletedAt}: {new Date(item.deletedAt).toLocaleDateString()}</p>
+                    {profile?.role === "admin" && <p>{t.deletedBy}: {item.deletedBy}</p>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRestore(item.id)}
+                    disabled={deletingId === item.id}
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-500 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-stone-300"
+                  >
+                    {deletingId === item.id ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+                    {t.restore}
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-3xl border border-orange-100 bg-white p-8 text-center text-sm font-semibold text-stone-500 shadow-sm">
+            {t.noDeletedRecipes}
           </div>
         )}
       </section>

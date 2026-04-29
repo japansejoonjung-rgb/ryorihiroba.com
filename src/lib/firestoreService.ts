@@ -26,6 +26,15 @@ export type RecipeComment = {
   createdAtMs: number;
 };
 
+export type DeletedRecipe = {
+  id: string;
+  recipe: Recipe;
+  authorId: string;
+  deletedBy: string;
+  deletedAt: string;
+  source: 'firestore' | 'sample';
+};
+
 const defaultImage =
   'https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=1200&q=80';
 
@@ -97,6 +106,26 @@ const getRecipeSnapshotData = async (recipeId: string) => {
 const visitorDocId = (visitorId: string, recipeId: string) =>
   `${encodeURIComponent(visitorId)}_${encodeURIComponent(recipeId)}`;
 
+const recipeToFirestoreData = (recipe: Recipe) => {
+  const { id: _id, ...recipeData } = recipe;
+  return recipeData;
+};
+
+const normalizeDeletedRecipe = (id: string, data: Record<string, any>): DeletedRecipe => {
+  const recipeData = typeof data.recipeData === 'object' && data.recipeData
+    ? data.recipeData
+    : data;
+
+  return {
+    id,
+    recipe: normalizeRecipe(id, recipeData),
+    authorId: String(data.authorId ?? recipeData.authorId ?? ''),
+    deletedBy: String(data.deletedBy ?? ''),
+    deletedAt: String(data.deletedAt ?? new Date().toISOString()),
+    source: data.source === 'sample' ? 'sample' : 'firestore',
+  };
+};
+
 // 레시피 추가
 export const addRecipe = async (
   userId: string,
@@ -138,22 +167,55 @@ export const getAllRecipes = async () => {
 
 export const getDeletedRecipeIds = async () => {
   const db = getFirebaseDb();
-  const querySnapshot = await getDocs(collection(db, 'deletedRecipes'));
+  const querySnapshot = await getDocs(collection(db, 'deletedRecipeIds'));
   return new Set(querySnapshot.docs.map((item) => item.id));
 };
 
 export const isRecipeDeleted = async (recipeId: string) => {
   const db = getFirebaseDb();
-  const deletedSnap = await getDoc(doc(db, 'deletedRecipes', recipeId));
+  const deletedSnap = await getDoc(doc(db, 'deletedRecipeIds', recipeId));
   return deletedSnap.exists();
 };
 
-export const markRecipeDeleted = async (recipeId: string) => {
+export const markRecipeDeleted = async ({
+  recipeId,
+  deletedBy,
+  authorId,
+}: {
+  recipeId: string;
+  deletedBy: string;
+  authorId?: string;
+}) => {
   const db = getFirebaseDb();
-  await setDoc(doc(db, 'deletedRecipes', recipeId), {
+  await setDoc(doc(db, 'deletedRecipeIds', recipeId), {
     recipeId,
+    deletedBy,
+    authorId: authorId ?? '',
     deletedAt: new Date().toISOString(),
   });
+};
+
+export const getDeletedRecipesForUser = async (
+  userId: string,
+  isAdminUser: boolean
+): Promise<DeletedRecipe[]> => {
+  const db = getFirebaseDb();
+  const snapshots = isAdminUser
+    ? [await getDocs(collection(db, 'deletedRecipes'))]
+    : await Promise.all([
+        getDocs(query(collection(db, 'deletedRecipes'), where('deletedBy', '==', userId))),
+        getDocs(query(collection(db, 'deletedRecipes'), where('authorId', '==', userId))),
+      ]);
+
+  const deletedMap = new Map<string, DeletedRecipe>();
+  snapshots.forEach((snapshot) => {
+    snapshot.docs.forEach((item) => {
+      deletedMap.set(item.id, normalizeDeletedRecipe(item.id, item.data()));
+    });
+  });
+
+  return Array.from(deletedMap.values())
+    .sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
 };
 
 // 특정 레시피 가져오기
@@ -196,19 +258,70 @@ export const updateRecipe = async (
 // 레시피 삭제
 export const deleteRecipe = async (
   recipeId: string,
-  options: { hideEverywhere?: boolean } = {}
+  options: { deletedBy: string; recipe?: Recipe }
 ) => {
   const db = getFirebaseDb();
   const recipeRef = doc(db, 'recipes', recipeId);
   const recipeSnap = await getDoc(recipeRef);
+  const now = new Date().toISOString();
+
+  if (!recipeSnap.exists() && !options.recipe) {
+    await markRecipeDeleted({ recipeId, deletedBy: options.deletedBy });
+    return;
+  }
+
+  const source: DeletedRecipe['source'] = recipeSnap.exists() ? 'firestore' : 'sample';
+  const recipeData = recipeSnap.exists()
+    ? recipeSnap.data()
+    : recipeToFirestoreData(options.recipe as Recipe);
+  const authorId = String(recipeData.authorId ?? options.recipe?.authorId ?? '');
+
+  await setDoc(doc(db, 'deletedRecipes', recipeId), {
+    recipeId,
+    recipeData,
+    authorId,
+    deletedBy: options.deletedBy,
+    deletedAt: now,
+    source,
+  });
+
+  await setDoc(doc(db, 'deletedRecipeIds', recipeId), {
+    recipeId,
+    deletedBy: options.deletedBy,
+    authorId,
+    deletedAt: now,
+  });
 
   if (recipeSnap.exists()) {
     await deleteDoc(recipeRef);
   }
+};
 
-  if (options.hideEverywhere) {
-    await markRecipeDeleted(recipeId);
+export const restoreDeletedRecipe = async (recipeId: string) => {
+  const db = getFirebaseDb();
+  const deletedRef = doc(db, 'deletedRecipes', recipeId);
+  const deletedSnap = await getDoc(deletedRef);
+
+  if (!deletedSnap.exists()) {
+    throw new Error('삭제된 레시피를 찾을 수 없습니다.');
   }
+
+  const deletedData = deletedSnap.data();
+  const source = deletedData.source === 'sample' ? 'sample' : 'firestore';
+
+  if (source !== 'sample') {
+    const recipeData =
+      typeof deletedData.recipeData === 'object' && deletedData.recipeData
+        ? deletedData.recipeData
+        : {};
+    await setDoc(doc(db, 'recipes', recipeId), {
+      ...recipeData,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  await deleteDoc(deletedRef);
+  await deleteDoc(doc(db, 'deletedRecipeIds', recipeId));
 };
 
 export const getRecipeActivityStatus = async (userId: string, recipeId: string) => {
