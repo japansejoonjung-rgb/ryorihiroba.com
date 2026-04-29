@@ -2,33 +2,37 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { recipes as sampleRecipes } from "@/data/recipes";
-import { getAllRecipes } from "@/lib/firestoreService";
+import { getAllRecipes, getDeletedRecipeIds } from "@/lib/firestoreService";
 import { Recipe } from "@/types/recipe";
 
 export function useCommunityRecipes() {
   const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
+  const [deletedRecipeIds, setDeletedRecipeIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let mounted = true;
 
-    getAllRecipes()
-      .then((items) => {
-        if (mounted) {
-          setUserRecipes(items);
-          setError("");
-        }
-      })
-      .catch((recipeError) => {
-        if (mounted) {
-          setUserRecipes([]);
-          setError(recipeError instanceof Error ? recipeError.message : "레시피를 불러오지 못했습니다.");
-        }
-      })
-      .finally(() => {
+    const loadRecipes = async () => {
+      setLoading(true);
+      try {
+        const [items, deletedIds] = await Promise.all([getAllRecipes(), getDeletedRecipeIds()]);
+        if (!mounted) return;
+        setUserRecipes(items);
+        setDeletedRecipeIds(deletedIds);
+        setError("");
+      } catch (recipeError) {
+        if (!mounted) return;
+        setUserRecipes([]);
+        setDeletedRecipeIds(new Set());
+        setError(recipeError instanceof Error ? recipeError.message : "레시피를 불러오지 못했습니다.");
+      } finally {
         if (mounted) setLoading(false);
-      });
+      }
+    };
+
+    loadRecipes();
 
     return () => {
       mounted = false;
@@ -36,9 +40,13 @@ export function useCommunityRecipes() {
   }, []);
 
   const recipes = useMemo(() => {
-    const userRecipeIds = new Set(userRecipes.map((recipe) => recipe.id));
-    return [...userRecipes, ...sampleRecipes.filter((recipe) => !userRecipeIds.has(recipe.id))];
-  }, [userRecipes]);
+    const visibleUserRecipes = userRecipes.filter((recipe) => !deletedRecipeIds.has(recipe.id));
+    const userRecipeIds = new Set(visibleUserRecipes.map((recipe) => recipe.id));
+    return [
+      ...visibleUserRecipes,
+      ...sampleRecipes.filter((recipe) => !userRecipeIds.has(recipe.id) && !deletedRecipeIds.has(recipe.id)),
+    ];
+  }, [deletedRecipeIds, userRecipes]);
 
-  return { recipes, userRecipes, loading, error };
+  return { recipes, userRecipes, deletedRecipeIds, loading, error };
 }

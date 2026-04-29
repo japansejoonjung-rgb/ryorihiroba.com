@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import RecipeCard from "@/components/RecipeCard";
 import CategoryList from "@/components/CategoryList";
 import RankingList from "@/components/RankingList";
+import RecipeShelf from "@/components/RecipeShelf";
 import { popularKeywords, recipes as fallbackRecipes } from "@/data/recipes";
 import { useCommunityRecipes } from "@/hooks/useCommunityRecipes";
 import { useLanguage } from "@/context/LanguageContext";
-import { BookOpen, ChevronRight, Search, Sparkles, Utensils } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Search, Sparkles, Utensils } from "lucide-react";
+import { useRef } from "react";
 
 const guideLinks = [
   { key: "guideOne", query: "下ごしらえ" },
@@ -42,15 +43,42 @@ const themeCards = [
   },
 ];
 
+const magazineCards = [
+  {
+    titleKey: "magazineOne",
+    image: "https://images.unsplash.com/photo-1506368249639-73a05d6f6488?auto=format&fit=crop&w=900&q=80",
+    href: "/recipes?query=%E9%87%8E%E8%8F%9C",
+  },
+  {
+    titleKey: "magazineTwo",
+    image: "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=900&q=80",
+    href: "/recipes?query=%E3%81%A0%E3%81%97",
+  },
+  {
+    titleKey: "magazineThree",
+    image: "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=900&q=80",
+    href: "/recipes?category=%E4%BD%9C%E3%82%8A%E7%BD%AE%E3%81%8D",
+  },
+  {
+    titleKey: "magazineFour",
+    image: "https://images.unsplash.com/photo-1536304993881-ff6e9eefa2a6?auto=format&fit=crop&w=900&q=80",
+    href: "/recipes?query=%E3%81%94%E9%A3%AF",
+  },
+];
+
 export default function HomePage() {
   const { t, categoryName } = useLanguage();
   const { recipes, loading } = useCommunityRecipes();
+  const magazineRef = useRef<HTMLDivElement>(null);
   const recipePool = recipes.length > 0 ? recipes : fallbackRecipes;
-  const recommended = recipePool.slice(0, 6);
+  const bestRecipes = [...recipePool].sort((a, b) => b.likes + b.views - (a.likes + a.views)).slice(0, 10);
   const popular = [...recipePool].sort((a, b) => b.views - a.views).slice(0, 5);
-  const latest = [...recipePool].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 4);
+  const latest = [...recipePool].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 10);
   const creators = recipePool.slice(0, 4).map((recipe) => recipe.author);
   const heroRecipe = recipePool[0] ?? fallbackRecipes[0];
+  const scrollMagazine = (direction: number) => {
+    magazineRef.current?.scrollBy({ left: direction * 360, behavior: "smooth" });
+  };
 
   return (
     <div>
@@ -90,44 +118,37 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-10">
-        <div className="mb-6 flex items-end justify-between gap-4">
-          <div>
-            <p className="font-bold text-orange-500">{t.themedSearch}</p>
-            <h2 className="text-3xl font-black">{t.themeTitle}</h2>
-          </div>
-          <Link href="/categories" className="hidden items-center gap-1 text-sm font-bold text-orange-500 sm:inline-flex">
-            {t.categories}
-            <ChevronRight size={16} />
-          </Link>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {themeCards.map((theme) => (
-            <Link key={theme.category} href={`/recipes?category=${encodeURIComponent(theme.category)}`} className="group overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-              <div className="h-32 overflow-hidden">
-                <img src={theme.image} alt={t[theme.titleKey]} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
-              </div>
-              <div className="p-4">
-                <p className="text-xs font-bold text-orange-500">{categoryName(theme.category)}</p>
-                <h3 className="mt-1 text-lg font-black">{t[theme.titleKey]}</h3>
-                <p className="mt-2 text-sm leading-6 text-stone-500">{t[theme.descKey]}</p>
-              </div>
+      <section className="mx-auto max-w-7xl px-4 py-8">
+        <div className="rounded-3xl border border-orange-100 bg-white p-5 shadow-sm sm:p-7">
+          <div className="mb-6 flex items-end justify-between gap-4">
+            <div>
+              <p className="font-bold text-lime-600">{t.themedSearch}</p>
+              <h2 className="text-2xl font-black sm:text-3xl">{t.themeTitle}</h2>
+            </div>
+            <Link href="/categories" className="hidden items-center gap-1 rounded-full border border-orange-200 px-4 py-2 text-sm font-bold text-orange-500 hover:bg-orange-50 sm:inline-flex">
+              {t.categories}
+              <ChevronRight size={16} />
             </Link>
-          ))}
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {themeCards.map((theme) => (
+              <Link key={theme.category} href={`/recipes?category=${encodeURIComponent(theme.category)}`} className="group overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+                <div className="h-32 overflow-hidden">
+                  <img src={theme.image} alt={t[theme.titleKey]} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
+                </div>
+                <div className="p-4">
+                  <p className="text-xs font-bold text-orange-500">{categoryName(theme.category)}</p>
+                  <h3 className="mt-1 text-lg font-black">{t[theme.titleKey]}</h3>
+                  <p className="mt-2 text-sm leading-6 text-stone-500">{t[theme.descKey]}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-10">
-        <div className="mb-6 flex items-end justify-between gap-4">
-          <div>
-            <p className="font-bold text-orange-500">{t.recommended}</p>
-            <h2 className="text-3xl font-black">{t.recommendedRecipes}</h2>
-          </div>
-          <Link href="/recipes" className="text-sm font-bold text-orange-500">{t.more}</Link>
-        </div>
-        {loading && <p className="mb-5 rounded-2xl bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-600">{t.loadedRecipes}</p>}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{recommended.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} />)}</div>
-      </section>
+      {loading && <p className="mx-auto max-w-7xl px-4 text-sm font-semibold text-orange-600">{t.loadedRecipes}</p>}
+      <RecipeShelf eyebrow={t.popular} title={t.bestRecipes} recipes={bestRecipes} moreHref="/ranking" ranked />
 
       <section className="bg-white/70 py-10">
         <div className="mx-auto grid max-w-7xl gap-6 px-4 lg:grid-cols-[1.2fr_0.8fr]">
@@ -156,24 +177,46 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-10">
-        <div className="mb-6">
-          <p className="font-bold text-orange-500">{t.categories}</p>
-          <h2 className="text-3xl font-black">{t.categorySearchTitle}</h2>
+      <section className="mx-auto max-w-7xl px-4 py-8">
+        <div className="rounded-3xl border border-orange-100 bg-white p-5 shadow-sm sm:p-7">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <div>
+              <p className="font-bold text-stone-900">{t.guide}</p>
+              <h2 className="mt-1 text-2xl font-black text-lime-600 sm:text-3xl">{t.expertMagazine}</h2>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => scrollMagazine(-1)} className="tap-target rounded-full border border-stone-200 bg-white p-2 text-stone-500 shadow-sm hover:text-orange-500" aria-label="previous">
+                <ChevronLeft size={22} />
+              </button>
+              <button type="button" onClick={() => scrollMagazine(1)} className="tap-target rounded-full border border-stone-200 bg-white p-2 text-stone-500 shadow-sm hover:text-orange-500" aria-label="next">
+                <ChevronRight size={22} />
+              </button>
+            </div>
+          </div>
+          <div ref={magazineRef} className="flex snap-x gap-5 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {magazineCards.map((item) => (
+              <Link key={item.titleKey} href={item.href} className="group min-w-[260px] snap-start sm:min-w-[360px] lg:min-w-[260px]">
+                <div className="overflow-hidden rounded-2xl bg-orange-50">
+                  <img src={item.image} alt={t[item.titleKey]} className="h-36 w-full object-cover transition duration-300 group-hover:scale-105" />
+                </div>
+                <p className="mt-3 line-clamp-2 text-sm font-bold leading-6 text-stone-800 group-hover:text-orange-500">{t[item.titleKey]}</p>
+              </Link>
+            ))}
+          </div>
         </div>
-        <CategoryList />
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-10">
-        <div className="mb-6 flex items-end justify-between gap-4">
-          <div>
-            <p className="font-bold text-orange-500">{t.latest}</p>
-            <h2 className="text-3xl font-black">{t.latestRecipes}</h2>
+      <section className="mx-auto max-w-7xl px-4 py-8">
+        <div className="rounded-3xl border border-orange-100 bg-white p-5 shadow-sm sm:p-7">
+          <div className="mb-6">
+            <p className="font-bold text-lime-600">{t.categories}</p>
+            <h2 className="text-2xl font-black sm:text-3xl">{t.categorySearchTitle}</h2>
           </div>
-          <Link href="/recipes" className="text-sm font-bold text-orange-500">{t.more}</Link>
+          <CategoryList />
         </div>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">{latest.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} />)}</div>
       </section>
+
+      <RecipeShelf eyebrow={t.latest} title={t.latestRecipes} recipes={latest} moreHref="/recipes" />
 
       <section className="mx-auto max-w-7xl px-4 py-10">
         <div className="mb-6">

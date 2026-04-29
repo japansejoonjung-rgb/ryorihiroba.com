@@ -111,7 +111,7 @@ export default function MyPage() {
 
     setDeletingId(recipeId);
     try {
-      await deleteRecipe(recipeId);
+      await deleteRecipe(recipeId, { hideEverywhere: profile?.role === "admin" });
       setMyRecipes((items) => items.filter((item) => item.id !== recipeId));
     } finally {
       setDeletingId("");

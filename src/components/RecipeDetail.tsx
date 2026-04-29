@@ -174,7 +174,7 @@ export default function RecipeDetail({ recipe, relatedRecipes }: Props) {
     const confirmed = window.confirm(t.deleteConfirm);
     if (!confirmed) return;
 
-    await deleteRecipe(recipe.id);
+    await deleteRecipe(recipe.id, { hideEverywhere: profile?.role === "admin" });
     router.push("/recipes");
   };
 
