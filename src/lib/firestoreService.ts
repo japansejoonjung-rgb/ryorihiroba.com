@@ -6,10 +6,12 @@ import {
   getDoc,
   getDocs,
   increment,
+  onSnapshot,
   query,
   setDoc,
   updateDoc,
   where,
+  Unsubscribe,
 } from 'firebase/firestore';
 import { getFirebaseDb } from './firebase';
 import { awardPointsOnce } from './userService';
@@ -165,10 +167,42 @@ export const getAllRecipes = async () => {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 };
 
+export const subscribeAllRecipes = (
+  onUpdate: (recipes: Recipe[]) => void,
+  onError?: (error: Error) => void
+): Unsubscribe => {
+  const db = getFirebaseDb();
+  return onSnapshot(
+    collection(db, 'recipes'),
+    (snapshot) => {
+      onUpdate(
+        snapshot.docs
+          .map((recipeDoc) => normalizeRecipe(recipeDoc.id, recipeDoc.data()))
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      );
+    },
+    (error) => onError?.(error)
+  );
+};
+
 export const getDeletedRecipeIds = async () => {
   const db = getFirebaseDb();
   const querySnapshot = await getDocs(collection(db, 'deletedRecipeIds'));
   return new Set(querySnapshot.docs.map((item) => item.id));
+};
+
+export const subscribeDeletedRecipeIds = (
+  onUpdate: (ids: Set<string>) => void,
+  onError?: (error: Error) => void
+): Unsubscribe => {
+  const db = getFirebaseDb();
+  return onSnapshot(
+    collection(db, 'deletedRecipeIds'),
+    (snapshot) => {
+      onUpdate(new Set(snapshot.docs.map((item) => item.id)));
+    },
+    (error) => onError?.(error)
+  );
 };
 
 export const isRecipeDeleted = async (recipeId: string) => {

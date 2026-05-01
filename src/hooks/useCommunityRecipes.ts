@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { recipes as sampleRecipes } from "@/data/recipes";
-import { getAllRecipes, getDeletedRecipeIds } from "@/lib/firestoreService";
+import { subscribeAllRecipes, subscribeDeletedRecipeIds } from "@/lib/firestoreService";
 import { Recipe } from "@/types/recipe";
 
 export function useCommunityRecipes() {
@@ -13,29 +13,35 @@ export function useCommunityRecipes() {
 
   useEffect(() => {
     let mounted = true;
-
-    const loadRecipes = async () => {
-      setLoading(true);
-      try {
-        const [items, deletedIds] = await Promise.all([getAllRecipes(), getDeletedRecipeIds()]);
+    const unsubscribeRecipes = subscribeAllRecipes(
+      (items) => {
         if (!mounted) return;
         setUserRecipes(items);
-        setDeletedRecipeIds(deletedIds);
         setError("");
-      } catch (recipeError) {
+        setLoading(false);
+      },
+      (recipeError) => {
         if (!mounted) return;
         setUserRecipes([]);
-        setDeletedRecipeIds(new Set());
-        setError(recipeError instanceof Error ? recipeError.message : "레시피를 불러오지 못했습니다.");
-      } finally {
-        if (mounted) setLoading(false);
+        setError(recipeError.message || "레시피를 불러오지 못했습니다.");
+        setLoading(false);
       }
-    };
+    );
 
-    loadRecipes();
+    const unsubscribeDeletedIds = subscribeDeletedRecipeIds(
+      (deletedIds) => {
+        if (mounted) setDeletedRecipeIds(deletedIds);
+      },
+      () => {
+        // If rules were not published yet, keep recipes usable and only skip the hidden-id overlay.
+        if (mounted) setDeletedRecipeIds(new Set());
+      }
+    );
 
     return () => {
       mounted = false;
+      unsubscribeRecipes();
+      unsubscribeDeletedIds();
     };
   }, []);
 
